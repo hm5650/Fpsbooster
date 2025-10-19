@@ -9,21 +9,6 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 local GRAY_SKY_ID = "rbxassetid://114666145996289"
-local PHYSICS_SLEEP_THRESHOLD = 0.01
-local COLLISION_GROUP_NAME = "OptimizedParts"
-local MAX_RENDER_DISTANCE = 100
-local FOV_ANGLE = 90
-local OPTIMIZATION_INTERVAL = 0.5
-local CLEANUP_INTERVAL = 0.1
-
-local OptimizedParts = {}
-local OriginalProperties = {}
-local Running = true
-
-pcall(function()
-    PhysicsService:CreateCollisionGroup(COLLISION_GROUP_NAME)
-    PhysicsService:CollisionGroupSetCollidable(COLLISION_GROUP_NAME, COLLISION_GROUP_NAME, false)
-end)
 
 local function setSmoothPlastic()
     local player = Players.LocalPlayer
@@ -49,24 +34,37 @@ local function setSmoothPlastic()
 end
 setSmoothPlastic()
 
-local function storeOriginalProperties(instance)
-    if not OriginalProperties[instance] then
-        OriginalProperties[instance] = {
-            Material = instance.Material,
-            Reflectance = instance.Reflectance,
-            Transparency = instance.Transparency,
-            CastShadow = instance.CastShadow
-        }
-    end
-end
+local PHYSICS_SLEEP_THRESHOLD = 0.1
+local PHYSICS_MAX_STEERING_FORCE = 10
+local COLLISION_GROUP_NAME = "OptimizedParts"
+local MAX_DISTANCE = 50
+
+pcall(function()
+    PhysicsService:CreateCollisionGroup(COLLISION_GROUP_NAME)
+    PhysicsService:CollisionGroupSetCollidable(COLLISION_GROUP_NAME, COLLISION_GROUP_NAME, false)
+end)
 
 local function removePlayerAnimations()
+    local localPlayer = LocalPlayer
+    local localCharacter = localPlayer.Character
+    local localRootPart = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
+    
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
+        if player ~= localPlayer then
             local character = player.Character
             if character then
                 local humanoid = character:FindFirstChildOfClass("Humanoid")
-                if humanoid then
+                local rootPart = character:FindFirstChild("HumanoidRootPart")
+                
+                -- Check if player is far from local player
+                local isFar = true
+                if localRootPart and rootPart then
+                    local distance = (localRootPart.Position - rootPart.Position).Magnitude
+                    isFar = distance > MAX_DISTANCE
+                end
+                
+                if isFar and humanoid then
+                    -- Remove animations only for distant players
                     for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
                         track:Stop()
                     end
@@ -77,52 +75,25 @@ local function removePlayerAnimations()
                     end
                 end
                 
+                -- Apply other optimizations based on distance
                 for _, part in ipairs(character:GetDescendants()) do
                     if part:IsA("BasePart") then
-                        part.Material = Enum.Material.SmoothPlastic
-                        part.Reflectance = 0
-                        part.CastShadow = false
-                        
-                        storeOriginalProperties(part)
-                        pcall(function()
-                            PhysicsService:SetPartCollisionGroup(part, COLLISION_GROUP_NAME)
-                        end)
+                        if isFar then
+                            part.Material = Enum.Material.SmoothPlastic
+                            part.Reflectance = 0
+                            part.CastShadow = false
+                            
+                            storeOriginalProperties(part)
+                            pcall(function()
+                                PhysicsService:SetPartCollisionGroup(part, COLLISION_GROUP_NAME)
+                            end)
+                        end
                     elseif part:IsA("ParticleEmitter") or part:IsA("Trail") or 
                            part:IsA("Smoke") or part:IsA("Fire") then
-                        part.Enabled = false
+                        part.Enabled = not isFar -- Enable effects only for nearby players
                     end
                 end
             end
-        end
-    end
-end
-
-local function optimizeUnanchoredParts()
-    local unanchoredCount = 0
-    local maxUnanchored = 50 -- Limit unanchored parts
-    
-    for _, part in ipairs(workspace:GetDescendants()) do
-        if part:IsA("BasePart") and not part.Anchored then
-            unanchoredCount = unanchoredCount + 1
-            
-            if unanchoredCount > maxUnanchored then
-                local distance = (part.Position - Camera.CFrame.Position).Magnitude
-                if distance > MAX_RENDER_DISTANCE then
-                    part.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                    part.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                    
-                    if part.AssemblyLinearVelocity.Magnitude > 5 then
-                        part.Anchored = true
-                        task.delay(2, function()
-                            if part and part.Parent then
-                                part.Anchored = false
-                            end
-                        end)
-                    end
-                end
-            end
-            
-            part.CanCollide = (distance or 0) < MAX_RENDER_DISTANCE
         end
     end
 end
@@ -133,7 +104,6 @@ local function applyGraySky()
             obj:Destroy()
         end
     end
-    
     local sky = Instance.new("Sky")
     sky.SkyboxBk = GRAY_SKY_ID
     sky.SkyboxDn = GRAY_SKY_ID
@@ -143,7 +113,7 @@ local function applyGraySky()
     sky.SkyboxUp = GRAY_SKY_ID
     sky.SunAngularSize = 0
     sky.MoonAngularSize = 0
-    sky.StarCount = 0
+    sky.StarCount = 0  -- Remove stars
     sky.Parent = Lighting
 end
 
@@ -183,33 +153,6 @@ local function optimizeLighting()
     end
 end
 
-local function removeReflectionsAndOptimize()
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") then
-            storeOriginalProperties(obj)
-            obj.Material = Enum.Material.SmoothPlastic
-            obj.Reflectance = 0
-            obj.CastShadow = false
-            
-            for _, child in pairs(obj:GetChildren()) do
-                if child:IsA("SurfaceAppearance") or child:IsA("Reflection") then
-                    child:Destroy()
-                end
-            end
-            
-            if obj:CanSetNetworkOwnership() then
-                obj:SetNetworkOwnershipAuto()
-            end
-            
-            pcall(function()
-                PhysicsService:SetPartCollisionGroup(obj, COLLISION_GROUP_NAME)
-            end)
-            
-        elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") then
-            obj.Enabled = false
-        end
-    end
-end
 
 local function convertToLowPoly()
     local HttpService = game:GetService("HttpService")
@@ -369,13 +312,89 @@ local function convertToLowPoly()
     pcall(processWorkspace)
 end
 
-local function optimizes()
-    settings().Physics.AllowSleep = true
+local function removeReflectionsAndOptimize()
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            obj.Material = Enum.Material.SmoothPlastic
+            obj.Reflectance = 0
+            
+            for _, child in pairs(obj:GetChildren()) do
+                if child:IsA("SurfaceAppearance") then
+                    child:Destroy()
+                end
+            end
+            
+            if obj:CanSetNetworkOwnership() then
+                obj:SetNetworkOwnershipAuto()
+            end
+            
+            pcall(function()
+                PhysicsService:SetPartCollisionGroup(obj, COLLISION_GROUP_NAME)
+            end)
+            
+            if obj:GetPropertyChangedSignal("AssemblyLinearVelocity") then
+                obj.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                obj.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+            end
+            
+        elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") then
+            obj.Enabled = false
+            
+        elseif obj:IsA("Reflection") then
+            obj:Destroy()
+        end
+    end
+end
+
+local function disableConstraints()
+    for _, c in ipairs(workspace:GetDescendants()) do
+        if (c:IsA("AlignPosition") or c:IsA("AlignOrientation") or c:IsA("Motor") or c:IsA("HingeConstraint") or c:IsA("RodConstraint")) and not shouldSkip(c) then
+            pcall(function()
+                c.Enabled = false
+            end)
+        end
+    end
+end
+
+local function throttleTextures()
+    for _, t in ipairs(workspace:GetDescendants()) do
+        if (t:IsA("Decal") or t:IsA("Texture") or t:IsA("ImageLabel") or t:IsA("ImageButton")) and not shouldSkip(t) then
+            pcall(function()
+                t.Transparency = 1
+            end)
+        elseif t:IsA("SurfaceAppearance") and not shouldSkip(t) then
+            pcall(function() t:Destroy() end)
+        end
+    end
+end
+
+local function optimizePhysics()
     settings().Rendering.QualityLevel = 1
-    settings().Rendering.EagerBulkExecution = false
-    settings().Rendering.TextureQuality = Enum.TextureQuality.Low
     settings().Physics.PhysicsEnvironmentalThrottle = 2
-    setfpscap(20000)
+    
+    for _, part in pairs(workspace:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CastShadow = false
+            
+            if part:IsGrounded() then
+                part.Anchored = false
+                part.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                part.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+            end
+        end
+    end
+end
+
+local function throttleParticles()
+    for _, p in ipairs(workspace:GetDescendants()) do
+        if p:IsA("ParticleEmitter") and not shouldSkip(p) then
+            pcall(function()
+                -- lower lifetime/emission rate for distant or all emitters
+                p.Enabled = false
+                -- alternative: p.Rate = math.min(p.Rate, 10)
+            end)
+        end
+    end
 end
 
 local function forcePhysicsSleep()
@@ -392,61 +411,54 @@ local function forcePhysicsSleep()
     end
 end
 
--- Enhanced culling with player animation and part optimization
 local function applyCulling()
+    local maxDistance = 400 -- Anything further than this gets hidden
+    local fovAngle = 100 -- Field of view cone in degrees
     local cam = Camera
-    
+
     for _, part in pairs(workspace:GetDescendants()) do
-        if part:IsA("BasePart") and part:IsDescendantOf(workspace) then
-            local distance = (cam.CFrame.Position - part.Position).Magnitude
-            
-            -- Distance-based optimization
-            if distance > MAX_RENDER_DISTANCE then
-                part.LocalTransparencyModifier = 1
-                part.CastShadow = false
-                
-                -- Force physics sleep for distant unanchored parts
-                if not part.Anchored then
-                    part.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                    part.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                end
+        if part:IsA("BasePart") and part:IsDescendantOf(workspace) and part.Transparency < 1 and part.CanCollide then
+            local pos, onScreen = cam:WorldToViewportPoint(part.Position)
+            local dirToPart = (part.Position - cam.CFrame.Position).Unit
+            local camDir = cam.CFrame.LookVector
+            local angle = math.deg(math.acos(math.clamp(camDir:Dot(dirToPart), -1, 1)))
+            local dist = (cam.CFrame.Position - part.Position).Magnitude
+
+            if onScreen and angle < fovAngle and dist < maxDistance then
+                part.LocalTransparencyModifier = 0
             else
-                -- FOV-based culling for closer objects
-                local pos, onScreen = cam:WorldToViewportPoint(part.Position)
-                local dirToPart = (part.Position - cam.CFrame.Position).Unit
-                local camDir = cam.CFrame.LookVector
-                local angle = math.deg(math.acos(math.clamp(camDir:Dot(dirToPart), -1, 1)))
-                
-                if onScreen and angle < FOV_ANGLE then
-                    part.LocalTransparencyModifier = 0
-                else
-                    part.LocalTransparencyModifier = 1
-                end
+                part.LocalTransparencyModifier = 1
             end
         end
     end
 end
 
-local function applyOptimizations()
-    removePlayerAnimations()
-    optimizeUnanchoredParts()
+local function optimizes()
+    settings().Physics.AllowSleep = true
+    settings().Rendering.QualityLevel = 1
+    settings().Rendering.EagerBulkExecution = false
+    settings().Rendering.TextureQuality = Enum.TextureQuality.Low
+    settings().Physics.PhysicsEnvironmentalThrottle = 2
+    setfpscap(20000)
+end
+
+local function applya()
     applyGraySky()
     applyFullBright()
     simplifyTerrain()
     optimizeLighting()
     removeReflectionsAndOptimize()
-    optimizes()
+    optimizePhysics()
     setSmoothPlastic()
+    removePlayerAnimations()
     convertToLowPoly()
-    
-    StarterGui:SetCore("SendNotification", {
-        Title = "AntiLag Started",
-        Text = "Noticing any? yay or nay",
-        Duration = 3,
-    })
+    optimizes()
+    disableConstraints()
+    throttleParticles()
+    throttleTextures()
 end
 
-applyOptimizations()
+applya()
 
 Players.PlayerAdded:Connect(function(player)
     player.CharacterAdded:Connect(function(character)
@@ -467,51 +479,22 @@ task.spawn(function()
     while Running and task.wait(OPTIMIZATION_INTERVAL) do
         pcall(function()
             removePlayerAnimations()
-            optimizeUnanchoredParts()
-            forcePhysicsSleep()
         end)
     end
 end)
 
 task.spawn(function()
-    while Running and task.wait(CLEANUP_INTERVAL) do
-        pcall(function()
-            applyGraySky()
-            optimizeLighting()
-            simplifyTerrain()
-        end)
+    while task.wait(10) do
+        pcall(applya)
+    end
+end)
+
+task.spawn(function()
+    while task.wait(5) do
+        pcall(forcePhysicsSleep)
     end
 end)
 
 RunService.RenderStepped:Connect(function()
-    if Running then
-        pcall(applyCulling)
-    end
+    pcall(applyCulling)
 end)
-
-local function cleanup()
-    Running = false
-    
-    for part, properties in pairs(OriginalProperties) do
-        if part and part.Parent then
-            for property, value in pairs(properties) do
-                pcall(function()
-                    part[property] = value
-                end)
-            end
-        end
-    end
-    
-    pcall(function()
-        for _, part in ipairs(workspace:GetDescendants()) do
-            if part:IsA("BasePart") then
-                PhysicsService:SetPartCollisionGroup(part, "Default")
-            end
-        end
-    end)
-end
-
-return {
-    cleanup = cleanup,
-    applyOptimizations = applyOptimizations
-}
