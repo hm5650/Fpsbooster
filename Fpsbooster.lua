@@ -211,6 +211,164 @@ local function removeReflectionsAndOptimize()
     end
 end
 
+local function convertToLowPoly()
+    local HttpService = game:GetService("HttpService")
+    
+    local replacementPrimitives = {
+        "Ball", "Block", "Cylinder", "Wedge"
+    }
+    
+    local complexMeshKeywords = {
+        "mesh", "Mesh", "part", "Part", "model", "Model", 
+        "detail", "Detail", "ornament", "Ornament",
+        "decal", "Decal", "couch", "design", "Design"
+    }
+    
+    local function shouldSimplify(part)
+        if part:IsA("MeshPart") then
+            return true
+        end
+        
+        if part:IsA("Part") then
+            -- Check if it has complex children or special materials
+            for _, child in ipairs(part:GetChildren()) do
+                if child:IsA("SpecialMesh") or child:IsA("BlockMesh") or 
+                   child:IsA("CylinderMesh") or child:IsA("FileMesh") then
+                    return true
+                end
+            end
+            
+            local partName = part.Name:lower()
+            for _, keyword in ipairs(complexMeshKeywords) do
+                if partName:find(keyword:lower()) then
+                    return true
+                end
+            end
+        end
+        
+        return false
+    end
+    
+    local function simplifyMeshPart(meshPart)
+        if not meshPart or not meshPart.Parent then return end
+        
+        local originalSize = meshPart.Size
+        local originalCFrame = meshPart.CFrame
+        local originalColor = meshPart.Color
+        local originalMaterial = meshPart.Material
+        local originalTransparency = meshPart.Transparency
+        
+        -- Create replacement part
+        local replacement = Instance.new("Part")
+        replacement.Name = "LowPoly_" .. meshPart.Name
+        replacement.Size = originalSize
+        replacement.CFrame = originalCFrame
+        replacement.Color = originalColor
+        replacement.Material = originalMaterial
+        replacement.Transparency = originalTransparency
+        replacement.Anchored = meshPart.Anchored
+        replacement.CanCollide = meshPart.CanCollide
+        replacement.CastShadow = false
+        replacement.Material = Enum.Material.SmoothPlastic
+        
+        if meshPart:IsA("MeshPart") and meshPart.MeshId ~= "" then
+            local meshSize = meshPart.Size
+            local aspectRatio = meshSize.Y / meshSize.X
+            
+            if aspectRatio > 2 then
+                replacement.Shape = Enum.PartType.Cylinder
+            elseif math.abs(meshSize.X - meshSize.Y) < 0.1 and math.abs(meshSize.Y - meshSize.Z) < 0.1 then
+                replacement.Shape = Enum.PartType.Ball
+            else
+                replacement.Shape = Enum.PartType.Block
+            end
+        else
+            replacement.Shape = Enum.PartType.Block
+        end
+        
+        for _, child in ipairs(meshPart:GetChildren()) do
+            if child:IsA("Weld") or child:IsA("WeldConstraint") or 
+               child:IsA("Attachment") or child:IsA("Motor6D") then
+                child:Clone().Parent = replacement
+            end
+        end
+        
+        replacement.Parent = meshPart.Parent
+        meshPart:Destroy()
+        
+        return replacement
+    end
+    
+    local function simplifyModel(model)
+        if not model:IsA("Model") and not model:IsA("Folder") then
+            return
+        end
+        
+        local partsToSimplify = {}
+        
+        for _, descendant in ipairs(model:GetDescendants()) do
+            if descendant:IsA("MeshPart") or descendant:IsA("Part") then
+                if shouldSimplify(descendant) then
+                    table.insert(partsToSimplify, descendant)
+                end
+            end
+        end
+        
+        for _, part in ipairs(partsToSimplify) do
+            pcall(simplifyMeshPart, part)
+        end
+    end
+    
+    local function reduceMeshDetail(mesh)
+        if mesh:IsA("SpecialMesh") or mesh:IsA("FileMesh") then
+            -- For SpecialMesh, reduce detail by scaling or changing mesh type
+            if mesh.MeshType == Enum.MeshType.Head then
+                mesh.Scale = mesh.Scale * 1.2  -- Simplify by scaling up
+            elseif mesh.MeshType == Enum.MeshType.Sphere then
+                mesh.MeshType = Enum.MeshType.Head  -- Use lower detail sphere
+            end
+        end
+    end
+    
+    local function processWorkspace()
+        local modelsProcessed = 0
+        local partsSimplified = 0
+        
+        for _, model in ipairs(workspace:GetDescendants()) do
+            if model:IsA("Model") and #model:GetChildren() > 0 then
+                pcall(function()
+                    simplifyModel(model)
+                    modelsProcessed += 1
+                end)
+            end
+        end
+        
+        for _, part in ipairs(workspace:GetDescendants()) do
+            if part:IsA("MeshPart") and shouldSimplify(part) then
+                pcall(function()
+                    simplifyMeshPart(part)
+                    partsSimplified += 1
+                end)
+            end
+            
+            if part:IsA("Part") then
+                for _, child in ipairs(part:GetChildren()) do
+                    if child:IsA("SpecialMesh") or child:IsA("FileMesh") then
+                        pcall(function()
+                            reduceMeshDetail(child)
+                        end)
+                    end
+                end
+            end
+        end
+        
+        print(string.format("Low-poly conversion complete: %d models processed, %d parts simplified", 
+              modelsProcessed, partsSimplified))
+    end
+    
+    pcall(processWorkspace)
+end
+
 local function optimizes()
     settings().Physics.AllowSleep = true
     settings().Rendering.QualityLevel = 1
@@ -279,6 +437,7 @@ local function applyOptimizations()
     removeReflectionsAndOptimize()
     optimizes()
     setSmoothPlastic()
+    convertToLowPoly()
     
     StarterGui:SetCore("SendNotification", {
         Title = "AntiLag Started",
