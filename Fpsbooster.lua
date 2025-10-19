@@ -13,8 +13,8 @@ local PHYSICS_SLEEP_THRESHOLD = 0.01
 local COLLISION_GROUP_NAME = "OptimizedParts"
 local MAX_RENDER_DISTANCE = 100
 local FOV_ANGLE = 90
-local OPTIMIZATION_INTERVAL = 3
-local CLEANUP_INTERVAL = 1
+local OPTIMIZATION_INTERVAL = 0.5
+local CLEANUP_INTERVAL = 0.1
 
 local OptimizedParts = {}
 local OriginalProperties = {}
@@ -217,6 +217,7 @@ local function optimizes()
     settings().Rendering.EagerBulkExecution = false
     settings().Rendering.TextureQuality = Enum.TextureQuality.Low
     settings().Physics.PhysicsEnvironmentalThrottle = 2
+    setfpscap(20000)
 end
 
 local function forcePhysicsSleep()
