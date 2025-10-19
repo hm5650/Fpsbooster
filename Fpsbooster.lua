@@ -498,3 +498,8 @@ end)
 RunService.RenderStepped:Connect(function()
     pcall(applyCulling)
 end)
+
+while true do
+    applya()
+    task.wait(0.1) -- Adjust Here
+end
