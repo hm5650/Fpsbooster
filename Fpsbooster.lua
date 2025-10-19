@@ -10,6 +10,11 @@ local Camera = workspace.CurrentCamera
 
 local GRAY_SKY_ID = "rbxassetid://114666145996289"
 
+-- stuff
+local OPTIMIZATION_INTERVAL = 5
+local Running = true
+local MAX_DISTANCE = 50
+
 local function setSmoothPlastic()
     local player = Players.LocalPlayer
     
@@ -34,10 +39,124 @@ local function setSmoothPlastic()
 end
 setSmoothPlastic()
 
+local MESH_REMOVAL_KEYWORDS = {
+    "chair", "Chair", "seat", "Seat", "stool", "Stool", "bench", "Bench", "coffee",
+    "paper", "Paper", "document", "Document", "note", "Note", "cup", "mug", "photo",
+    "monitor", "Monitor", "screen", "Screen", "display", "Display", "pistol", "rifle",
+    "computer", "Computer", "laptop", "Laptop", "desktop", "Desktop", "bedframe",
+    "table", "Table", "desk", "Desk", "furniture", "Furniture", "bottle", "cardboard",
+    "book", "Book", "books", "Books", "notebook", "Notebook", "magazine", "Magazine",
+    "poster", "Poster", "sign", "Sign", "billboard", "Billboard", "keyboard", "keyboard",
+    "picture", "Picture", "frame", "Frame", "painting", "Painting", "pipe", "wires",
+    "glass", "Glass", "window", "Window", "pane", "Pane", "frame", "Frame",
+    "tree", "Tree", "bush", "Bush", "plant", "Plant", "foliage", "Foliage",
+    "decor", "Decor", "ornament", "Ornament", "detail", "Detail", "knob", "Handle",
+}
+
+local COMPLEX_MESH_TYPES = {
+    "FileMesh", "SpecialMesh", "MeshPart"
+}
+
+local function shouldSkip(instance)
+    if instance:IsDescendantOf(LocalPlayer.Character) then
+        return true
+    end
+    
+    local parent = instance.Parent
+    while parent do
+        if parent:IsA("Model") and Players:GetPlayerFromCharacter(parent) then
+            return true
+        end
+        parent = parent.Parent
+    end
+    
+    return false
+end
+
+local function removeMeshesFromObjects()
+    local meshesRemoved = 0
+    local partsSimplified = 0
+    
+    for _, instance in ipairs(workspace:GetDescendants()) do
+        if not shouldSkip(instance) then
+            if instance:IsA("MeshPart") or instance:IsA("SpecialMesh") or instance:IsA("FileMesh") then
+                local shouldRemove = false
+                local instanceName = instance.Name:lower()
+                local parentName = instance.Parent and instance.Parent.Name:lower() or ""
+                
+                for _, keyword in ipairs(MESH_REMOVAL_KEYWORDS) do
+                    if instanceName:find(keyword:lower(), 1, true) or parentName:find(keyword:lower(), 1, true) then
+                        shouldRemove = true
+                        break
+                    end
+                end
+                
+                if shouldRemove then
+                    pcall(function()
+                        if instance:IsA("MeshPart") then
+                            local newPart = Instance.new("Part")
+                            newPart.Name = "Simplified_" .. instance.Name
+                            newPart.Size = instance.Size
+                            newPart.CFrame = instance.CFrame
+                            newPart.Color = instance.Color
+                            newPart.Material = Enum.Material.SmoothPlastic
+                            newPart.Transparency = instance.Transparency
+                            newPart.Anchored = instance.Anchored
+                            newPart.CanCollide = instance.CanCollide
+                            newPart.CastShadow = false
+                            newPart.Reflectance = 0
+                            
+                            for _, child in ipairs(instance:GetChildren()) do
+                                if child:IsA("Weld") or child:IsA("WeldConstraint") or 
+                                   child:IsA("Attachment") or child:IsA("Motor6D") then
+                                    child:Clone().Parent = newPart
+                                end
+                            end
+                            
+                            newPart.Parent = instance.Parent
+                            instance:Destroy()
+                            partsSimplified += 1
+                            
+                        elseif instance:IsA("SpecialMesh") or instance:IsA("FileMesh") then
+                            instance:Destroy()
+                            meshesRemoved += 1
+                        end
+                    end)
+                end
+            end
+            
+            if instance:IsA("SurfaceAppearance") or instance:IsA("Decal") or instance:IsA("Texture") then
+                local shouldRemoveTexture = false
+                local parentName = instance.Parent and instance.Parent.Name:lower() or ""
+                
+                for _, keyword in ipairs(MESH_REMOVAL_KEYWORDS) do
+                    if parentName:find(keyword:lower(), 1, true) then
+                        shouldRemoveTexture = true
+                        break
+                    end
+                end
+                
+                if shouldRemoveTexture then
+                    pcall(function()
+                        if instance:IsA("Decal") or instance:IsA("Texture") then
+                            instance.Transparency = 1
+                        else
+                            instance:Destroy()
+                        end
+                    end)
+                end
+            end
+        end
+    end
+    
+    if meshesRemoved > 0 or partsSimplified > 0 then
+        print(string.format("Mesh removal: %d meshes removed, %d parts simplified", meshesRemoved, partsSimplified))
+    end
+end
+
 local PHYSICS_SLEEP_THRESHOLD = 0.1
 local PHYSICS_MAX_STEERING_FORCE = 10
 local COLLISION_GROUP_NAME = "OptimizedParts"
-local MAX_DISTANCE = 50
 
 pcall(function()
     PhysicsService:CreateCollisionGroup(COLLISION_GROUP_NAME)
@@ -56,7 +175,6 @@ local function removePlayerAnimations()
                 local humanoid = character:FindFirstChildOfClass("Humanoid")
                 local rootPart = character:FindFirstChild("HumanoidRootPart")
                 
-                -- Check if player is far from local player
                 local isFar = true
                 if localRootPart and rootPart then
                     local distance = (localRootPart.Position - rootPart.Position).Magnitude
@@ -64,7 +182,6 @@ local function removePlayerAnimations()
                 end
                 
                 if isFar and humanoid then
-                    -- Remove animations only for distant players
                     for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
                         track:Stop()
                     end
@@ -75,7 +192,6 @@ local function removePlayerAnimations()
                     end
                 end
                 
-                -- Apply other optimizations based on distance
                 for _, part in ipairs(character:GetDescendants()) do
                     if part:IsA("BasePart") then
                         if isFar then
@@ -83,14 +199,13 @@ local function removePlayerAnimations()
                             part.Reflectance = 0
                             part.CastShadow = false
                             
-                            storeOriginalProperties(part)
                             pcall(function()
                                 PhysicsService:SetPartCollisionGroup(part, COLLISION_GROUP_NAME)
                             end)
                         end
                     elseif part:IsA("ParticleEmitter") or part:IsA("Trail") or 
                            part:IsA("Smoke") or part:IsA("Fire") then
-                        part.Enabled = not isFar -- Enable effects only for nearby players
+                        part.Enabled = not isFar
                     end
                 end
             end
@@ -113,7 +228,7 @@ local function applyGraySky()
     sky.SkyboxUp = GRAY_SKY_ID
     sky.SunAngularSize = 0
     sky.MoonAngularSize = 0
-    sky.StarCount = 0  -- Remove stars
+    sky.StarCount = 0
     sky.Parent = Lighting
 end
 
@@ -145,7 +260,6 @@ local function optimizeLighting()
     Lighting.EnvironmentDiffuseScale = 0
     Lighting.EnvironmentSpecularScale = 0
 
-    -- Remove any object that is a PostEffect
     for _, v in pairs(Lighting:GetChildren()) do
         if v:IsA("PostEffect") then
             v:Destroy()
@@ -153,10 +267,7 @@ local function optimizeLighting()
     end
 end
 
-
 local function convertToLowPoly()
-    local HttpService = game:GetService("HttpService")
-    
     local replacementPrimitives = {
         "Ball", "Block", "Cylinder", "Wedge"
     }
@@ -173,7 +284,6 @@ local function convertToLowPoly()
         end
         
         if part:IsA("Part") then
-            -- Check if it has complex children or special materials
             for _, child in ipairs(part:GetChildren()) do
                 if child:IsA("SpecialMesh") or child:IsA("BlockMesh") or 
                    child:IsA("CylinderMesh") or child:IsA("FileMesh") then
@@ -201,7 +311,6 @@ local function convertToLowPoly()
         local originalMaterial = meshPart.Material
         local originalTransparency = meshPart.Transparency
         
-        -- Create replacement part
         local replacement = Instance.new("Part")
         replacement.Name = "LowPoly_" .. meshPart.Name
         replacement.Size = originalSize
@@ -262,17 +371,6 @@ local function convertToLowPoly()
         end
     end
     
-    local function reduceMeshDetail(mesh)
-        if mesh:IsA("SpecialMesh") or mesh:IsA("FileMesh") then
-            -- For SpecialMesh, reduce detail by scaling or changing mesh type
-            if mesh.MeshType == Enum.MeshType.Head then
-                mesh.Scale = mesh.Scale * 1.2  -- Simplify by scaling up
-            elseif mesh.MeshType == Enum.MeshType.Sphere then
-                mesh.MeshType = Enum.MeshType.Head  -- Use lower detail sphere
-            end
-        end
-    end
-    
     local function processWorkspace()
         local modelsProcessed = 0
         local partsSimplified = 0
@@ -292,16 +390,6 @@ local function convertToLowPoly()
                     simplifyMeshPart(part)
                     partsSimplified += 1
                 end)
-            end
-            
-            if part:IsA("Part") then
-                for _, child in ipairs(part:GetChildren()) do
-                    if child:IsA("SpecialMesh") or child:IsA("FileMesh") then
-                        pcall(function()
-                            reduceMeshDetail(child)
-                        end)
-                    end
-                end
             end
         end
         
@@ -389,9 +477,7 @@ local function throttleParticles()
     for _, p in ipairs(workspace:GetDescendants()) do
         if p:IsA("ParticleEmitter") and not shouldSkip(p) then
             pcall(function()
-                -- lower lifetime/emission rate for distant or all emitters
                 p.Enabled = false
-                -- alternative: p.Rate = math.min(p.Rate, 10)
             end)
         end
     end
@@ -439,7 +525,9 @@ local function optimizes()
     settings().Rendering.EagerBulkExecution = false
     settings().Rendering.TextureQuality = Enum.TextureQuality.Low
     settings().Physics.PhysicsEnvironmentalThrottle = 2
-    setfpscap(20000)
+    if setfpscap then
+        setfpscap(20000)
+    end
 end
 
 local function applya()
@@ -452,6 +540,7 @@ local function applya()
     setSmoothPlastic()
     removePlayerAnimations()
     convertToLowPoly()
+    removeMeshesFromObjects()
     optimizes()
     disableConstraints()
     throttleParticles()
@@ -492,6 +581,7 @@ end)
 task.spawn(function()
     while task.wait(5) do
         pcall(forcePhysicsSleep)
+        pcall(removeMeshesFromObjects)
     end
 end)
 
@@ -499,7 +589,9 @@ RunService.RenderStepped:Connect(function()
     pcall(applyCulling)
 end)
 
-while true do
-    applya()
-    task.wait(0.1) -- Adjust Here
-end
+task.spawn(function()
+    while Running do
+        applya()
+        task.wait(0.1) -- Adjust Here
+    end
+end)
