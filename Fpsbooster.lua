@@ -8,12 +8,22 @@ local workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
+local function safeCall(func, name, ...)
+    local success, err = pcall(func, ...)
+    if not success then
+        warn(string.format("Error in %s: %s", name, err))
+    end
+    return success
+end
+
 local GRAY_SKY_ID = "rbxassetid://114666145996289"
 
 -- stuff
 local OPTIMIZATION_INTERVAL = 5
 local Running = true
 local MAX_DISTANCE = 50
+local lastRunTime = 0
+local MIN_INTERVAL = 1
 
 local function setSmoothPlastic()
     local player = Players.LocalPlayer
@@ -40,16 +50,16 @@ end
 setSmoothPlastic()
 
 local MESH_REMOVAL_KEYWORDS = {
-    "chair", "Chair", "seat", "Seat", "stool", "Stool", "bench", "Bench", "coffee",
+    "chair", "Chair", "seat", "Seat", "stool", "Stool", "bench", "Bench", "coffee", "fruit",
     "paper", "Paper", "document", "Document", "note", "Note", "cup", "mug", "photo",
-    "monitor", "Monitor", "screen", "Screen", "display", "Display", "pistol", "rifle",
+    "monitor", "Monitor", "screen", "Screen", "display", "Display", "pistol", "rifle", "plate",
     "computer", "Computer", "laptop", "Laptop", "desktop", "Desktop", "bedframe",
-    "table", "Table", "desk", "Desk", "furniture", "Furniture", "bottle", "cardboard",
+    "table", "Table", "desk", "Desk", "furniture", "Furniture", "bottle", "cardboard", "Chest",
     "book", "Book", "books", "Books", "notebook", "Notebook", "magazine", "Magazine",
     "poster", "Poster", "sign", "Sign", "billboard", "Billboard", "keyboard", "keyboard",
-    "picture", "Picture", "frame", "Frame", "painting", "Painting", "pipe", "wires",
-    "glass", "Glass", "window", "Window", "pane", "Pane", "frame", "Frame",
-    "tree", "Tree", "bush", "Bush", "plant", "Plant", "foliage", "Foliage",
+    "picture", "Picture", "frame", "Frame", "painting", "Painting", "pipe", "wires", "fridge",
+    "glass", "Glass", "window", "Window", "pane", "Pane", "frame", "Frame", "shelf", "phone",
+    "tree", "Tree", "bush", "Bush", "plant", "Plant", "foliage", "Foliage", "Boxes", "Chair",
     "decor", "Decor", "ornament", "Ornament", "detail", "Detail", "knob", "Handle",
 }
 
@@ -73,84 +83,121 @@ local function shouldSkip(instance)
     return false
 end
 
+local function optimizeUI()
+    local function optimizeGuiElement(gui)
+        if gui:IsA("ImageLabel") or gui:IsA("ImageButton") then
+            gui.ImageTransparency = 0.5
+        elseif gui:IsA("Frame") or gui:IsA("TextLabel") then
+            gui.BackgroundTransparency = 0.5
+        end
+    end
+    
+    for _, gui in ipairs(StarterGui:GetDescendants()) do
+        safeCall(function() optimizeGuiElement(gui) end, "ui_optimization")
+    end
+end
+
 local function removeMeshesFromObjects()
     local meshesRemoved = 0
     local partsSimplified = 0
-    
+    local processedInstances = {}
+
+    local function isValidInstance(instance)
+        return instance and instance.Parent and not processedInstances[instance]
+    end
+
     for _, instance in ipairs(workspace:GetDescendants()) do
-        if not shouldSkip(instance) then
-            if instance:IsA("MeshPart") or instance:IsA("SpecialMesh") or instance:IsA("FileMesh") then
-                local shouldRemove = false
-                local instanceName = instance.Name:lower()
-                local parentName = instance.Parent and instance.Parent.Name:lower() or ""
-                
-                for _, keyword in ipairs(MESH_REMOVAL_KEYWORDS) do
-                    if instanceName:find(keyword:lower(), 1, true) or parentName:find(keyword:lower(), 1, true) then
-                        shouldRemove = true
-                        break
-                    end
-                end
-                
-                if shouldRemove then
-                    pcall(function()
-                        if instance:IsA("MeshPart") then
-                            local newPart = Instance.new("Part")
-                            newPart.Name = "Simplified_" .. instance.Name
-                            newPart.Size = instance.Size
-                            newPart.CFrame = instance.CFrame
-                            newPart.Color = instance.Color
-                            newPart.Material = Enum.Material.SmoothPlastic
-                            newPart.Transparency = instance.Transparency
-                            newPart.Anchored = instance.Anchored
-                            newPart.CanCollide = instance.CanCollide
-                            newPart.CastShadow = false
-                            newPart.Reflectance = 0
-                            
-                            for _, child in ipairs(instance:GetChildren()) do
-                                if child:IsA("Weld") or child:IsA("WeldConstraint") or 
-                                   child:IsA("Attachment") or child:IsA("Motor6D") then
-                                    child:Clone().Parent = newPart
-                                end
-                            end
-                            
-                            newPart.Parent = instance.Parent
-                            instance:Destroy()
-                            partsSimplified += 1
-                            
-                        elseif instance:IsA("SpecialMesh") or instance:IsA("FileMesh") then
-                            instance:Destroy()
-                            meshesRemoved += 1
-                        end
-                    end)
+        if not isValidInstance(instance) or shouldSkip(instance) then
+            continue
+        end
+
+        processedInstances[instance] = true
+
+        if instance:IsA("MeshPart") or instance:IsA("SpecialMesh") or instance:IsA("FileMesh") then
+            local shouldRemove = false
+            local instanceName = instance.Name:lower()
+            local parentName = instance.Parent and instance.Parent.Name:lower() or ""
+
+            for _, keyword in ipairs(MESH_REMOVAL_KEYWORDS) do
+                if instanceName:find(keyword:lower(), 1, true) or parentName:find(keyword:lower(), 1, true) then
+                    shouldRemove = true
+                    break
                 end
             end
-            
-            if instance:IsA("SurfaceAppearance") or instance:IsA("Decal") or instance:IsA("Texture") then
-                local shouldRemoveTexture = false
-                local parentName = instance.Parent and instance.Parent.Name:lower() or ""
-                
-                for _, keyword in ipairs(MESH_REMOVAL_KEYWORDS) do
-                    if parentName:find(keyword:lower(), 1, true) then
-                        shouldRemoveTexture = true
-                        break
-                    end
-                end
-                
-                if shouldRemoveTexture then
-                    pcall(function()
-                        if instance:IsA("Decal") or instance:IsA("Texture") then
-                            instance.Transparency = 1
-                        else
-                            instance:Destroy()
+
+            if shouldRemove then
+                local success, err = pcall(function()
+                    if instance:IsA("MeshPart") then
+                        local newPart = Instance.new("Part")
+                        newPart.Name = "Simplified_" .. instance.Name
+                        newPart.Size = instance.Size
+                        newPart.CFrame = instance.CFrame
+                        newPart.Color = instance.Color or Color3.new(0.5, 0.5, 0.5)
+                        newPart.Material = Enum.Material.SmoothPlastic
+                        newPart.Transparency = instance.Transparency
+                        newPart.Anchored = instance.Anchored
+                        newPart.CanCollide = instance.CanCollide
+                        newPart.CastShadow = false
+                        newPart.Reflectance = 0
+
+                        for _, child in ipairs(instance:GetChildren()) do
+                            if child:IsA("Weld") or child:IsA("WeldConstraint") or 
+                               child:IsA("Attachment") or child:IsA("Motor6D") then
+                                local clonedChild = child:Clone()
+                                clonedChild.Parent = newPart
+                            end
                         end
-                    end)
+
+                        pcall(function()
+                            PhysicsService:SetPartCollisionGroup(newPart, COLLISION_GROUP_NAME)
+                        end)
+
+                        newPart.Parent = instance.Parent
+                        instance:Destroy()
+                        partsSimplified += 1
+                    elseif instance:IsA("SpecialMesh") or instance:IsA("FileMesh") then
+                        instance:Destroy()
+                        meshesRemoved += 1
+                    end
+                end)
+
+                if not success then
+                    warn(string.format("Failed to process mesh %s: %s", instance:GetFullName(), err))
+                end
+            end
+        end
+        
+        if instance:IsA("SurfaceAppearance") or instance:IsA("Decal") or instance:IsA("Texture") then
+            local shouldRemoveTexture = false
+            local parentName = instance.Parent and instance.Parent.Name:lower() or ""
+
+            for _, keyword in ipairs(MESH_REMOVAL_KEYWORDS) do
+                if parentName:find(keyword:lower(), 1, true) then
+                    shouldRemoveTexture = true
+                    break
+                end
+            end
+
+            if shouldRemoveTexture then
+                local success, err = pcall(function()
+                    if instance:IsA("Decal") or instance:IsA("Texture") then
+                        instance.Transparency = 1
+                    else
+                        instance:Destroy()
+                    end
+                end)
+
+                if not success then
+                    warn(string.format("Failed to process texture %s: %s", instance:GetFullName(), err))
                 end
             end
         end
     end
-    
+
     if meshesRemoved > 0 or partsSimplified > 0 then
         print(string.format("Mesh removal: %d meshes removed, %d parts simplified", meshesRemoved, partsSimplified))
+    else
+        print("No meshes or parts were processed for removal.")
     end
 end
 
@@ -519,6 +566,14 @@ local function applyCulling()
     end
 end
 
+local function rateLimitedOptimize()
+    local currentTime = tick()
+    if currentTime - lastRunTime >= MIN_INTERVAL then
+        selectiveOptimize()
+        lastRunTime = currentTime
+    end
+end
+
 local function optimizes()
     settings().Physics.AllowSleep = true
     settings().Rendering.QualityLevel = 1
@@ -545,6 +600,7 @@ local function applya()
     disableConstraints()
     throttleParticles()
     throttleTextures()
+    optimizeUI()
 end
 
 applya()
@@ -553,45 +609,41 @@ Players.PlayerAdded:Connect(function(player)
     player.CharacterAdded:Connect(function(character)
         if Running then
             task.wait(1)
-            removePlayerAnimations()
+            safeCall(removePlayerAnimations, "new_player_animations")
         end
     end)
 end)
 
 for _, player in ipairs(Players:GetPlayers()) do
     if player.Character then
-        removePlayerAnimations()
+        safeCall(removePlayerAnimations, "initial_player_animations")
     end
 end
 
-task.spawn(function()
-    while Running and task.wait(OPTIMIZATION_INTERVAL) do
-        pcall(function()
-            removePlayerAnimations()
-        end)
-    end
-end)
-
-task.spawn(function()
-    while task.wait(10) do
-        pcall(applya)
-    end
-end)
-
-task.spawn(function()
-    while task.wait(5) do
-        pcall(forcePhysicsSleep)
-        pcall(removeMeshesFromObjects)
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    pcall(applyCulling)
-end)
-
-task.spawn(function()
+local function mainOptimizationLoop()
+    local lastHeavyOptimization = 0
+    local HEAVY_OPTIMIZATION_INTERVAL = 10 -- seconds
+    
     while Running do
-        applya()
-        task.wait(0.1) -- Adjust Here
+        local currentTime = tick()
+        
+        if currentTime - lastHeavyOptimization >= HEAVY_OPTIMIZATION_INTERVAL then
+            safeCall(applya, "heavy_optimization")
+            safeCall(removeMeshesFromObjects, "mesh_removal")
+            safeCall(forcePhysicsSleep, "physics_sleep")
+            lastHeavyOptimization = currentTime
+        end
+        
+        safeCall(removePlayerAnimations, "player_animations")
+        safeCall(applyCulling, "culling")
+        
+        task.wait(0.1) -- Frame rate cap
     end
-end)
+end
+
+task.spawn(mainOptimizationLoop)
+
+local function stopOptimizations()
+    Running = false
+    print("Optimizations stopped")
+end
