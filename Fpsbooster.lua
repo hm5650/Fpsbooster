@@ -25,6 +25,25 @@ local MAX_DISTANCE = 50
 local lastRunTime = 0
 local MIN_INTERVAL = 1
 
+local MESH_REMOVAL_KEYWORDS = {
+    "chair", "Chair", "seat", "Seat", "stool", "Stool", "bench", "Bench", 
+    "coffee", "fruit", "paper", "Paper", "document", "Document", "note", "Note", 
+    "cup", "mug", "photo", "monitor", "Monitor", "screen", "Screen", "display", "Display", 
+    "pistol", "rifle", "plate", "computer", "Computer", "laptop", "Laptop",  "Barrel", "barrel",
+    "desktop", "Desktop", "bedframe", "table", "Table", "desk", "Desk",  "Plank", "plank", "Cloud",
+    "furniture", "Furniture", "bottle", "cardboard", "Chest", "book", "Book", "Pillow", "pillow",
+    "books", "Books", "notebook", "Notebook", "magazine", "Magazine", "poster", "Poster", "cloud",
+    "sign", "Sign", "billboard", "Billboard", "keyboard", "Keyboard", "picture", "Picture", 
+    "frame", "Frame", "painting", "Painting", "pipe", "wires", "fridge", "glass", "Glass", 
+    "window", "Window", "pane", "Pane", "shelf", "phone", "tree", "Tree", "bush", "Bush", 
+    "plant", "Plant", "foliage", "Foliage", "Boxes", "decor", "Decor", "ornament", "Ornament", 
+    "detail", "Detail", "knob", "Handle", "mesh", "Mesh", "model", "Model", "part", "Part"
+}
+
+local COMPLEX_MESH_TYPES = {
+    "FileMesh", "SpecialMesh", "MeshPart"
+}
+
 local function setSmoothPlastic()
     local player = Players.LocalPlayer
     
@@ -49,24 +68,217 @@ local function setSmoothPlastic()
 end
 setSmoothPlastic()
 
-local MESH_REMOVAL_KEYWORDS = {
-    "chair", "Chair", "seat", "Seat", "stool", "Stool", "bench", "Bench", 
-    "coffee", "fruit", "paper", "Paper", "document", "Document", "note", "Note", 
-    "cup", "mug", "photo", "monitor", "Monitor", "screen", "Screen", "display", "Display", 
-    "pistol", "rifle", "plate", "computer", "Computer", "laptop", "Laptop",  "Barrel", "barrel",
-    "desktop", "Desktop", "bedframe", "table", "Table", "desk", "Desk",  "Plank", "plank", "Cloud",
-    "furniture", "Furniture", "bottle", "cardboard", "Chest", "book", "Book", "Pillow", "pillow",
-    "books", "Books", "notebook", "Notebook", "magazine", "Magazine", "poster", "Poster", "cloud",
-    "sign", "Sign", "billboard", "Billboard", "keyboard", "Keyboard", "picture", "Picture", 
-    "frame", "Frame", "painting", "Painting", "pipe", "wires", "fridge", "glass", "Glass", 
-    "window", "Window", "pane", "Pane", "shelf", "phone", "tree", "Tree", "bush", "Bush", 
-    "plant", "Plant", "foliage", "Foliage", "Boxes", "decor", "Decor", "ornament", "Ornament", 
-    "detail", "Detail", "knob", "Handle", "mesh", "Mesh", "model", "Model", "part", "Part"
-}
 
-local COMPLEX_MESH_TYPES = {
-    "FileMesh", "SpecialMesh", "MeshPart"
-}
+local function Fpsgui()
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FPSCounter"
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 160, 0, 100)
+frame.Position = UDim2.new(0, 10, 0, 10)
+frame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+frame.BorderColor3 = Color3.new(0.3, 0.3, 0.3)
+frame.BorderSizePixel = 2
+frame.Parent = screenGui
+
+local dragHeader = Instance.new("Frame")
+dragHeader.Size = UDim2.new(1, 0, 0, 20)
+dragHeader.Position = UDim2.new(0, 0, 0, 0)
+dragHeader.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+dragHeader.BorderColor3 = Color3.new(0.4, 0.4, 0.4)
+dragHeader.BorderSizePixel = 1
+dragHeader.Parent = frame
+
+local headerTitle = Instance.new("TextLabel")
+headerTitle.Size = UDim2.new(1, -25, 1, 0)
+headerTitle.Position = UDim2.new(0, 5, 0, 0)
+headerTitle.BackgroundTransparency = 1
+headerTitle.Text = "// FPS_MONITOR"
+headerTitle.TextColor3 = Color3.new(0, 1, 0)
+headerTitle.TextSize = 12
+headerTitle.Font = Enum.Font.Code
+headerTitle.TextXAlignment = Enum.TextXAlignment.Left
+headerTitle.Parent = dragHeader
+
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 20, 0, 20)
+closeButton.Position = UDim2.new(1, -20, 0, 0)
+closeButton.BackgroundColor3 = Color3.new(0.3, 0.1, 0.1)
+closeButton.BorderColor3 = Color3.new(0.6, 0.2, 0.2)
+closeButton.Text = "X"
+closeButton.TextColor3 = Color3.new(1, 0.3, 0.3)
+closeButton.TextSize = 12
+closeButton.Font = Enum.Font.Code
+closeButton.Parent = dragHeader
+
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(1, -10, 1, -30)
+contentFrame.Position = UDim2.new(0, 5, 0, 25)
+contentFrame.BackgroundTransparency = 1
+contentFrame.Parent = frame
+
+local fpsLabel = Instance.new("TextLabel")
+fpsLabel.Size = UDim2.new(1, 0, 0, 20)
+fpsLabel.Position = UDim2.new(0, 0, 0, 0)
+fpsLabel.BackgroundTransparency = 1
+fpsLabel.Text = "fps: 0"
+fpsLabel.TextColor3 = Color3.new(0.8, 0.8, 1)
+fpsLabel.TextSize = 14
+fpsLabel.Font = Enum.Font.Code
+fpsLabel.TextXAlignment = Enum.TextXAlignment.Left
+fpsLabel.Parent = contentFrame
+
+local msLabel = Instance.new("TextLabel")
+msLabel.Size = UDim2.new(1, 0, 0, 20)
+msLabel.Position = UDim2.new(0, 0, 0, 20)
+msLabel.BackgroundTransparency = 1
+msLabel.Text = "ms: 0.0"
+msLabel.TextColor3 = Color3.new(0.8, 0.8, 1)
+msLabel.TextSize = 14
+msLabel.Font = Enum.Font.Code
+msLabel.TextXAlignment = Enum.TextXAlignment.Left
+msLabel.Parent = contentFrame
+
+local minFpsLabel = Instance.new("TextLabel")
+minFpsLabel.Size = UDim2.new(1, 0, 0, 20)
+minFpsLabel.Position = UDim2.new(0, 0, 0, 40)
+minFpsLabel.BackgroundTransparency = 1
+minFpsLabel.Text = "min: 0"
+minFpsLabel.TextColor3 = Color3.new(1, 0.5, 0.5)
+minFpsLabel.TextSize = 12
+minFpsLabel.Font = Enum.Font.Code
+minFpsLabel.TextXAlignment = Enum.TextXAlignment.Left
+minFpsLabel.Parent = contentFrame
+
+local maxFpsLabel = Instance.new("TextLabel")
+maxFpsLabel.Size = UDim2.new(1, 0, 0, 20)
+maxFpsLabel.Position = UDim2.new(0, 0, 0, 55)
+maxFpsLabel.BackgroundTransparency = 1
+maxFpsLabel.Text = "max: 0"
+maxFpsLabel.TextColor3 = Color3.new(0.5, 1, 0.5)
+maxFpsLabel.TextSize = 12
+maxFpsLabel.Font = Enum.Font.Code
+maxFpsLabel.TextXAlignment = Enum.TextXAlignment.Left
+maxFpsLabel.Parent = contentFrame
+
+local fps = 0
+local frameCount = 0
+local lastUpdate = tick()
+local lastFrameTime = tick()
+local minFPS = math.huge
+local maxFPS = 0
+
+local function updateFPS()
+	frameCount = frameCount + 1
+	
+	local currentTime = tick()
+	local frameTime = (currentTime - lastFrameTime) * 1000
+	lastFrameTime = currentTime
+	
+	local elapsed = currentTime - lastUpdate
+	
+	fpsLabel.Text = "fps: " .. fps
+	msLabel.Text = string.format("ms: %.1f", frameTime)
+	
+	if elapsed >= 0.1 then
+		fps = math.floor(frameCount / elapsed + 0.5)
+		frameCount = 0
+		lastUpdate = currentTime
+		
+		if fps < minFPS then
+			minFPS = fps
+			minFpsLabel.Text = "min: " .. minFPS
+		end
+		if fps > maxFPS then
+			maxFPS = fps
+			maxFpsLabel.Text = "max: " .. maxFPS
+		end
+		
+		if fps >= 60 then
+			fpsLabel.TextColor3 = Color3.new(0.5, 1, 0.5)
+		elseif fps >= 30 then
+			fpsLabel.TextColor3 = Color3.new(1, 1, 0.5)
+		else
+			fpsLabel.TextColor3 = Color3.new(1, 0.5, 0.5)
+		end
+	   
+		if frameTime < 16.7 then
+			msLabel.TextColor3 = Color3.new(0.5, 1, 0.5)
+		elseif frameTime < 33.3 then
+			msLabel.TextColor3 = Color3.new(1, 1, 0.5)
+		else
+			msLabel.TextColor3 = Color3.new(1, 0.5, 0.5)
+		end
+	end
+end
+
+game:GetService("RunService").RenderStepped:Connect(updateFPS)
+
+local UserInputService = game:GetService("UserInputService")
+local dragging = false
+local dragInput
+local dragStart
+local startPos
+
+local function update(input)
+	local delta = input.Position - dragStart
+	frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+dragHeader.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = frame.Position
+		
+		local connection
+		connection = input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+				connection:Disconnect()
+			end
+		end)
+	end
+end)
+
+dragHeader.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		update(input)
+	end
+end)
+
+closeButton.MouseButton1Click:Connect(function()
+	screenGui:Destroy()
+end)
+
+closeButton.MouseEnter:Connect(function()
+	closeButton.BackgroundColor3 = Color3.new(0.5, 0.2, 0.2)
+	closeButton.TextColor3 = Color3.new(1, 0.5, 0.5)
+end)
+
+closeButton.MouseLeave:Connect(function()
+	closeButton.BackgroundColor3 = Color3.new(0.3, 0.1, 0.1)
+	closeButton.TextColor3 = Color3.new(1, 0.3, 0.3)
+end)
+
+frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton2 or input.UserInputType == Enum.UserInputType.Touch then
+		minFPS = math.huge
+		maxFPS = 0
+		minFpsLabel.Text = "min: 0"
+		maxFpsLabel.Text = "max: 0"
+	end
+end)
+end
+Fpsgui()
 
 local function shouldSkip(instance)
     if instance:IsDescendantOf(LocalPlayer.Character) then
@@ -598,13 +810,57 @@ local function rateLimitedOptimize()
 end
 
 local function optimizes()
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
     settings().Physics.AllowSleep = true
     settings().Rendering.QualityLevel = 1
     settings().Rendering.EagerBulkExecution = false
     settings().Rendering.TextureQuality = Enum.TextureQuality.Low
     settings().Physics.PhysicsEnvironmentalThrottle = 2
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    settings().Rendering.EagerBulkExecution = true
+    settings().Rendering.EnableFRM = true
+    settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level01
+    settings().Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalPhysicsThrottle.Disabled
+    settings().Physics.ThrottleAdjustTime = 10
     if setfpscap then
-        setfpscap(20000)
+        setfpscap(1000)
+    end
+end
+
+local function optimizeLightingAdvanced()
+    local Lighting = game:GetService("Lighting")
+    
+    Lighting.GlobalShadows = false
+    Lighting.Brightness = 2
+    Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+    Lighting.Ambient = Color3.new(1, 1, 1)
+    Lighting.ExposureCompensation = 0
+    
+    for _, effect in pairs(Lighting:GetChildren()) do
+        if effect:IsA("BlurEffect") or 
+           effect:IsA("ColorCorrectionEffect") or 
+           effect:IsA("SunRaysEffect") or
+           effect:IsA("BloomEffect") or
+           effect:IsA("DepthOfFieldEffect") then
+            effect:Destroy()
+        end
+    end
+end
+
+local function removeAllTextures()
+    local texturesRemoved = 0
+    
+    for _, object in pairs(workspace:GetDescendants()) do
+        if object:IsA("BasePart") then
+            object.Material = Enum.Material.SmoothPlastic
+            
+            for _, decal in pairs(object:GetChildren()) do
+                if decal:IsA("Decal") then
+                    decal:Destroy()
+                    texturesRemoved += 1
+                end
+            end
+        end
     end
 end
 
@@ -613,6 +869,7 @@ local function applya()
     applyFullBright()
     simplifyTerrain()
     optimizeLighting()
+    optimizeLightingAdvanced()
     removeReflectionsAndOptimize()
     optimizePhysics()
     setSmoothPlastic()
@@ -624,6 +881,7 @@ local function applya()
     throttleParticles()
     throttleTextures()
     optimizeUI()
+    removeAllTextures()
 end
 
 applya()
@@ -660,7 +918,7 @@ local function mainOptimizationLoop()
         safeCall(removePlayerAnimations, "player_animations")
         safeCall(applyCulling, "culling")
         
-        task.wait(0.1) -- Frame rate cap
+        task.wait(0.5) -- Frame rate cap
     end
 end
 
