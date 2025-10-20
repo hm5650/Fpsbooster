@@ -50,17 +50,18 @@ end
 setSmoothPlastic()
 
 local MESH_REMOVAL_KEYWORDS = {
-    "chair", "Chair", "seat", "Seat", "stool", "Stool", "bench", "Bench", "coffee", "fruit",
-    "paper", "Paper", "document", "Document", "note", "Note", "cup", "mug", "photo",
-    "monitor", "Monitor", "screen", "Screen", "display", "Display", "pistol", "rifle", "plate",
-    "computer", "Computer", "laptop", "Laptop", "desktop", "Desktop", "bedframe",
-    "table", "Table", "desk", "Desk", "furniture", "Furniture", "bottle", "cardboard", "Chest",
-    "book", "Book", "books", "Books", "notebook", "Notebook", "magazine", "Magazine",
-    "poster", "Poster", "sign", "Sign", "billboard", "Billboard", "keyboard", "keyboard",
-    "picture", "Picture", "frame", "Frame", "painting", "Painting", "pipe", "wires", "fridge",
-    "glass", "Glass", "window", "Window", "pane", "Pane", "frame", "Frame", "shelf", "phone",
-    "tree", "Tree", "bush", "Bush", "plant", "Plant", "foliage", "Foliage", "Boxes", "Chair",
-    "decor", "Decor", "ornament", "Ornament", "detail", "Detail", "knob", "Handle",
+    "chair", "Chair", "seat", "Seat", "stool", "Stool", "bench", "Bench", 
+    "coffee", "fruit", "paper", "Paper", "document", "Document", "note", "Note", 
+    "cup", "mug", "photo", "monitor", "Monitor", "screen", "Screen", "display", "Display", 
+    "pistol", "rifle", "plate", "computer", "Computer", "laptop", "Laptop",  "Barrel", "barrel",
+    "desktop", "Desktop", "bedframe", "table", "Table", "desk", "Desk",  "Plank", "plank", "Cloud",
+    "furniture", "Furniture", "bottle", "cardboard", "Chest", "book", "Book", "Pillow", "pillow",
+    "books", "Books", "notebook", "Notebook", "magazine", "Magazine", "poster", "Poster", "cloud",
+    "sign", "Sign", "billboard", "Billboard", "keyboard", "Keyboard", "picture", "Picture", 
+    "frame", "Frame", "painting", "Painting", "pipe", "wires", "fridge", "glass", "Glass", 
+    "window", "Window", "pane", "Pane", "shelf", "phone", "tree", "Tree", "bush", "Bush", 
+    "plant", "Plant", "foliage", "Foliage", "Boxes", "decor", "Decor", "ornament", "Ornament", 
+    "detail", "Detail", "knob", "Handle", "mesh", "Mesh", "model", "Model", "part", "Part"
 }
 
 local COMPLEX_MESH_TYPES = {
@@ -113,7 +114,7 @@ local function removeMeshesFromObjects()
 
         processedInstances[instance] = true
 
-        if instance:IsA("MeshPart") or instance:IsA("SpecialMesh") or instance:IsA("FileMesh") then
+        if instance:IsA("MeshPart") then
             local shouldRemove = false
             local instanceName = instance.Name:lower()
             local parentName = instance.Parent and instance.Parent.Name:lower() or ""
@@ -127,38 +128,59 @@ local function removeMeshesFromObjects()
 
             if shouldRemove then
                 local success, err = pcall(function()
-                    if instance:IsA("MeshPart") then
-                        local newPart = Instance.new("Part")
-                        newPart.Name = "Simplified_" .. instance.Name
-                        newPart.Size = instance.Size
-                        newPart.CFrame = instance.CFrame
-                        newPart.Color = instance.Color or Color3.new(0.5, 0.5, 0.5)
-                        newPart.Material = Enum.Material.SmoothPlastic
-                        newPart.Transparency = instance.Transparency
-                        newPart.Anchored = instance.Anchored
-                        newPart.CanCollide = instance.CanCollide
-                        newPart.CastShadow = false
-                        newPart.Reflectance = 0
-
-                        for _, child in ipairs(instance:GetChildren()) do
-                            if child:IsA("Weld") or child:IsA("WeldConstraint") or 
-                               child:IsA("Attachment") or child:IsA("Motor6D") then
-                                local clonedChild = child:Clone()
-                                clonedChild.Parent = newPart
-                            end
+                    local newPart = Instance.new("Part")
+                    newPart.Name = "Simplified_" .. instance.Name
+                    newPart.Size = instance.Size
+                    newPart.CFrame = instance.CFrame
+                    newPart.Color = Color3.new(0.5, 0.5, 0.5)
+                    newPart.Material = Enum.Material.SmoothPlastic
+                    newPart.Transparency = instance.Transparency
+                    newPart.Anchored = instance.Anchored
+                    newPart.CanCollide = instance.CanCollide
+                    newPart.CastShadow = false
+                    newPart.Reflectance = 0
+                    
+                    for _, child in ipairs(instance:GetChildren()) do
+                        if child:IsA("Weld") or child:IsA("WeldConstraint") or 
+                           child:IsA("Attachment") or child:IsA("Motor6D") then
+                            child:Clone().Parent = newPart
                         end
-
-                        pcall(function()
-                            PhysicsService:SetPartCollisionGroup(newPart, COLLISION_GROUP_NAME)
-                        end)
-
-                        newPart.Parent = instance.Parent
-                        instance:Destroy()
-                        partsSimplified += 1
-                    elseif instance:IsA("SpecialMesh") or instance:IsA("FileMesh") then
-                        instance:Destroy()
-                        meshesRemoved += 1
                     end
+
+                    pcall(function()
+                        PhysicsService:SetPartCollisionGroup(newPart, COLLISION_GROUP_NAME)
+                    end)
+
+                    newPart.Parent = instance.Parent
+                    instance:Destroy()
+                    partsSimplified += 1
+                end)
+
+                if not success then
+                    warn(string.format("Failed to process MeshPart %s: %s", instance:GetFullName(), err))
+                end
+            end
+        end
+        
+        if (instance:IsA("SpecialMesh") or instance:IsA("FileMesh")) and instance.Parent and instance.Parent:IsA("BasePart") then
+            local shouldRemove = false
+            local instanceName = instance.Name:lower()
+            local parentName = instance.Parent and instance.Parent.Name:lower() or ""
+            local partName = instance.Parent.Name:lower()
+
+            for _, keyword in ipairs(MESH_REMOVAL_KEYWORDS) do
+                if instanceName:find(keyword:lower(), 1, true) or parentName:find(keyword:lower(), 1, true) or partName:find(keyword:lower(), 1, true) then
+                    shouldRemove = true
+                    break
+                end
+            end
+
+            if shouldRemove then
+                local success, err = pcall(function()
+                    instance.Parent.Color = Color3.new(0.5, 0.5, 0.5)
+                    instance.Parent.Material = Enum.Material.SmoothPlastic
+                    instance:Destroy()
+                    meshesRemoved += 1
                 end)
 
                 if not success then
@@ -170,9 +192,10 @@ local function removeMeshesFromObjects()
         if instance:IsA("SurfaceAppearance") or instance:IsA("Decal") or instance:IsA("Texture") then
             local shouldRemoveTexture = false
             local parentName = instance.Parent and instance.Parent.Name:lower() or ""
+            local instanceName = instance.Name:lower()
 
             for _, keyword in ipairs(MESH_REMOVAL_KEYWORDS) do
-                if parentName:find(keyword:lower(), 1, true) then
+                if instanceName:find(keyword:lower(), 1, true) or parentName:find(keyword:lower(), 1, true) then
                     shouldRemoveTexture = true
                     break
                 end
