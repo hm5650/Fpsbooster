@@ -25,6 +25,11 @@ local MAX_DISTANCE = 50
 local lastRunTime = 0
 local MIN_INTERVAL = 1
 
+-- New variables for timed mesh removal
+local MESH_REMOVAL_INTERVAL = 20 -- Remove meshes every 20 seconds
+local MESH_REMOVAL_COUNT = 30 -- Remove 30 meshes at a time
+local lastMeshRemovalTime = 0
+
 local MESH_REMOVAL_KEYWORDS = {
     "chair", "Chair", "seat", "Seat", "stool", "Stool", "bench", "Bench", 
     "coffee", "fruit", "paper", "Paper", "document", "Document", "note", "Note", 
@@ -43,6 +48,134 @@ local MESH_REMOVAL_KEYWORDS = {
 local COMPLEX_MESH_TYPES = {
     "FileMesh", "SpecialMesh", "MeshPart"
 }
+
+-- New function to remove closest meshes based on keywords
+local function removeClosestMeshes()
+    local meshesRemoved = 0
+    local processedInstances = {}
+    local candidateMeshes = {}
+    
+    -- Get local player position for distance calculation
+    local localPlayerPos
+    if LocalPlayer and LocalPlayer.Character then
+        local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            localPlayerPos = rootPart.Position
+        end
+    end
+    
+    if not localPlayerPos then
+        return 0 -- Can't calculate distance without player position
+    end
+    
+    -- Collect all candidate meshes
+    for _, instance in ipairs(workspace:GetDescendants()) do
+        if not processedInstances[instance] and not shouldSkip(instance) then
+            processedInstances[instance] = true
+            
+            local isMesh = false
+            local meshInstance = nil
+            
+            if instance:IsA("MeshPart") then
+                isMesh = true
+                meshInstance = instance
+            elseif (instance:IsA("SpecialMesh") or instance:IsA("FileMesh")) and instance.Parent and instance.Parent:IsA("BasePart") then
+                isMesh = true
+                meshInstance = instance
+            end
+            
+            if isMesh and meshInstance then
+                local shouldRemove = false
+                local instanceName = meshInstance.Name:lower()
+                local parentName = meshInstance.Parent and meshInstance.Parent.Name:lower() or ""
+                
+                -- Check if mesh matches any keywords
+                for _, keyword in ipairs(MESH_REMOVAL_KEYWORDS) do
+                    if instanceName:find(keyword:lower(), 1, true) or parentName:find(keyword:lower(), 1, true) then
+                        shouldRemove = true
+                        break
+                    end
+                end
+                
+                if shouldRemove then
+                    -- Calculate distance from player
+                    local meshPos
+                    if meshInstance:IsA("MeshPart") then
+                        meshPos = meshInstance.Position
+                    else
+                        meshPos = meshInstance.Parent.Position
+                    end
+                    
+                    local distance = (localPlayerPos - meshPos).Magnitude
+                    
+                    table.insert(candidateMeshes, {
+                        instance = meshInstance,
+                        distance = distance
+                    })
+                end
+            end
+        end
+    end
+    
+    -- Sort meshes by distance (closest first)
+    table.sort(candidateMeshes, function(a, b)
+        return a.distance < b.distance
+    end)
+    
+    -- Remove the closest MESH_REMOVAL_COUNT meshes
+    for i = 1, math.min(MESH_REMOVAL_COUNT, #candidateMeshes) do
+        local meshData = candidateMeshes[i]
+        local meshInstance = meshData.instance
+        
+        local success, err = pcall(function()
+            if meshInstance:IsA("MeshPart") then
+                -- Replace MeshPart with simple Part
+                local newPart = Instance.new("Part")
+                newPart.Name = "Simplified_" .. meshInstance.Name
+                newPart.Size = meshInstance.Size
+                newPart.CFrame = meshInstance.CFrame
+                newPart.Color = Color3.new(0.5, 0.5, 0.5)
+                newPart.Material = Enum.Material.SmoothPlastic
+                newPart.Transparency = meshInstance.Transparency
+                newPart.Anchored = meshInstance.Anchored
+                newPart.CanCollide = meshInstance.CanCollide
+                newPart.CastShadow = false
+                newPart.Reflectance = 0
+                
+                for _, child in ipairs(meshInstance:GetChildren()) do
+                    if child:IsA("Weld") or child:IsA("WeldConstraint") or 
+                       child:IsA("Attachment") or child:IsA("Motor6D") then
+                        child:Clone().Parent = newPart
+                    end
+                end
+
+                pcall(function()
+                    PhysicsService:SetPartCollisionGroup(newPart, COLLISION_GROUP_NAME)
+                end)
+
+                newPart.Parent = meshInstance.Parent
+                meshInstance:Destroy()
+            else
+                -- Remove mesh from BasePart
+                meshInstance.Parent.Color = Color3.new(0.5, 0.5, 0.5)
+                meshInstance.Parent.Material = Enum.Material.SmoothPlastic
+                meshInstance:Destroy()
+            end
+            
+            meshesRemoved += 1
+        end)
+
+        if not success then
+            warn(string.format("Failed to remove mesh %s: %s", meshInstance:GetFullName(), err))
+        end
+    end
+    
+    if meshesRemoved > 0 then
+        print(string.format("Timed mesh removal: %d closest meshes removed", meshesRemoved))
+    end
+    
+    return meshesRemoved
+end
 
 local function setSmoothPlastic()
     local player = Players.LocalPlayer
@@ -700,6 +833,12 @@ local function mainOptimizationLoop()
     
     while Running do
         local currentTime = tick()
+        
+        -- Check if it's time for timed mesh removal (every 20 seconds)
+        if currentTime - lastMeshRemovalTime >= MESH_REMOVAL_INTERVAL then
+            safeCall(removeClosestMeshes, "timed_mesh_removal")
+            lastMeshRemovalTime = currentTime
+        end
         
         if currentTime - lastHeavyOptimization >= HEAVY_OPTIMIZATION_INTERVAL then
             safeCall(applya, "heavy_optimization")
