@@ -55,7 +55,6 @@ local function removeClosestMeshes()
     local processedInstances = {}
     local candidateMeshes = {}
     
-    -- Get local player position for distance calculation
     local localPlayerPos
     if LocalPlayer and LocalPlayer.Character then
         local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -65,7 +64,7 @@ local function removeClosestMeshes()
     end
     
     if not localPlayerPos then
-        return 0 -- Can't calculate distance without player position
+        return 0
     end
     
     -- Collect all candidate meshes
@@ -98,7 +97,6 @@ local function removeClosestMeshes()
                 end
                 
                 if shouldRemove then
-                    -- Calculate distance from player
                     local meshPos
                     if meshInstance:IsA("MeshPart") then
                         meshPos = meshInstance.Position
@@ -117,19 +115,16 @@ local function removeClosestMeshes()
         end
     end
     
-    -- Sort meshes by distance (closest first)
     table.sort(candidateMeshes, function(a, b)
         return a.distance < b.distance
     end)
     
-    -- Remove the closest MESH_REMOVAL_COUNT meshes
     for i = 1, math.min(MESH_REMOVAL_COUNT, #candidateMeshes) do
         local meshData = candidateMeshes[i]
         local meshInstance = meshData.instance
         
         local success, err = pcall(function()
             if meshInstance:IsA("MeshPart") then
-                -- Replace MeshPart with simple Part
                 local newPart = Instance.new("Part")
                 newPart.Name = "Simplified_" .. meshInstance.Name
                 newPart.Size = meshInstance.Size
@@ -156,7 +151,6 @@ local function removeClosestMeshes()
                 newPart.Parent = meshInstance.Parent
                 meshInstance:Destroy()
             else
-                -- Remove mesh from BasePart
                 meshInstance.Parent.Color = Color3.new(0.5, 0.5, 0.5)
                 meshInstance.Parent.Material = Enum.Material.SmoothPlastic
                 meshInstance:Destroy()
