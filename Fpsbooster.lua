@@ -8,6 +8,58 @@ local workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
+-- Configuration Table
+local Config = {
+    -- Optimization Settings
+    ENABLED = true,
+    OPTIMIZATION_INTERVAL = 5,
+    MIN_INTERVAL = 1,
+    MAX_DISTANCE = 50,
+    PERFORMANCE_MONITORING = true,
+    FPS_THRESHOLD = 30,
+    MESH_REMOVAL_ENABLED = true,
+    MESH_REMOVAL_INTERVAL = 15,
+    MESH_REMOVAL_COUNT = 30,
+    GRAY_SKY_ENABLED = true,
+    GRAY_SKY_ID = "rbxassetid://114666145996289",
+    FULL_BRIGHT_ENABLED = true,
+    SMOOTH_PLASTIC_ENABLED = true,
+    COLLISION_GROUP_NAME = "OptimizedParts",
+    OPTIMIZE_PHYSICS = true,
+    DISABLE_CONSTRAINTS = true,
+    THROTTLE_PARTICLES = true,
+    THROTTLE_TEXTURES = true,
+    REMOVE_ANIMATIONS = true,
+    LOW_POLY_CONVERSION = true,
+    SELECTIVE_TEXTURE_REMOVAL = true,
+    PRESERVE_IMPORTANT_TEXTURES = true,
+    IMPORTANT_TEXTURE_KEYWORDS = {"sign", "ui", "hud", "menu", "button"},
+    QUALITY_LEVEL = 1,
+    FPS_CAP = 1000,
+    MEMORY_CLEANUP_THRESHOLD = 500,
+    
+    -- Mesh Removal Keywords
+    MESH_REMOVAL_KEYWORDS = {
+        "chair", "Chair", "seat", "Seat", "stool", "Stool", "bench", "Bench", 
+        "coffee", "fruit", "paper", "Paper", "document", "Document", "note", "Note", 
+        "cup", "mug", "photo", "monitor", "Monitor", "screen", "Screen", "display", "Display", 
+        "pistol", "rifle", "plate", "computer", "Computer", "laptop", "Laptop",  "Barrel", "barrel",
+        "desktop", "Desktop", "bedframe", "table", "Table", "desk", "Desk",  "Plank", "plank", "Cloud",
+        "furniture", "Furniture", "bottle", "cardboard", "Chest", "book", "Book", "Pillow", "pillow",
+        "books", "Books", "notebook", "Notebook", "magazine", "Magazine", "poster", "Poster", "cloud",
+        "sign", "Sign", "billboard", "Billboard", "keyboard", "Keyboard", "picture", "Picture", 
+        "frame", "Frame", "painting", "Painting", "pipe", "wires", "fridge", "glass", "Glass", 
+        "window", "Window", "pane", "Pane", "shelf", "phone", "tree", "Tree", "bush", "Bush", 
+        "plant", "Plant", "foliage", "Foliage", "Boxes", "decor", "Decor", "ornament", "Ornament", 
+        "detail", "Detail", "knob", "Handle", "mesh", "Mesh", "model", "Model", "part", "Part"
+    },
+    
+    -- Complex Mesh Types
+    COMPLEX_MESH_TYPES = {
+        "FileMesh", "SpecialMesh", "MeshPart"
+    }
+}
+
 local function safeCall(func, name, ...)
     local success, err = pcall(func, ...)
     if not success then
@@ -16,41 +68,15 @@ local function safeCall(func, name, ...)
     return success
 end
 
-local GRAY_SKY_ID = "rbxassetid://114666145996289"
-
 -- stuff
-local OPTIMIZATION_INTERVAL = 5
-local Running = true
-local MAX_DISTANCE = 50
+local Running = Config.ENABLED
 local lastRunTime = 0
-local MIN_INTERVAL = 1
-
--- New variables for timed mesh removal
-local MESH_REMOVAL_INTERVAL = 20 -- Remove meshes every 20 seconds
-local MESH_REMOVAL_COUNT = 30 -- Remove 30 meshes at a time
 local lastMeshRemovalTime = 0
-
-local MESH_REMOVAL_KEYWORDS = {
-    "chair", "Chair", "seat", "Seat", "stool", "Stool", "bench", "Bench", 
-    "coffee", "fruit", "paper", "Paper", "document", "Document", "note", "Note", 
-    "cup", "mug", "photo", "monitor", "Monitor", "screen", "Screen", "display", "Display", 
-    "pistol", "rifle", "plate", "computer", "Computer", "laptop", "Laptop",  "Barrel", "barrel",
-    "desktop", "Desktop", "bedframe", "table", "Table", "desk", "Desk",  "Plank", "plank", "Cloud",
-    "furniture", "Furniture", "bottle", "cardboard", "Chest", "book", "Book", "Pillow", "pillow",
-    "books", "Books", "notebook", "Notebook", "magazine", "Magazine", "poster", "Poster", "cloud",
-    "sign", "Sign", "billboard", "Billboard", "keyboard", "Keyboard", "picture", "Picture", 
-    "frame", "Frame", "painting", "Painting", "pipe", "wires", "fridge", "glass", "Glass", 
-    "window", "Window", "pane", "Pane", "shelf", "phone", "tree", "Tree", "bush", "Bush", 
-    "plant", "Plant", "foliage", "Foliage", "Boxes", "decor", "Decor", "ornament", "Ornament", 
-    "detail", "Detail", "knob", "Handle", "mesh", "Mesh", "model", "Model", "part", "Part"
-}
-
-local COMPLEX_MESH_TYPES = {
-    "FileMesh", "SpecialMesh", "MeshPart"
-}
 
 -- New function to remove closest meshes based on keywords
 local function removeClosestMeshes()
+    if not Config.MESH_REMOVAL_ENABLED then return 0 end
+    
     local meshesRemoved = 0
     local processedInstances = {}
     local candidateMeshes = {}
@@ -89,7 +115,7 @@ local function removeClosestMeshes()
                 local parentName = meshInstance.Parent and meshInstance.Parent.Name:lower() or ""
                 
                 -- Check if mesh matches any keywords
-                for _, keyword in ipairs(MESH_REMOVAL_KEYWORDS) do
+                for _, keyword in ipairs(Config.MESH_REMOVAL_KEYWORDS) do
                     if instanceName:find(keyword:lower(), 1, true) or parentName:find(keyword:lower(), 1, true) then
                         shouldRemove = true
                         break
@@ -119,7 +145,7 @@ local function removeClosestMeshes()
         return a.distance < b.distance
     end)
     
-    for i = 1, math.min(MESH_REMOVAL_COUNT, #candidateMeshes) do
+    for i = 1, math.min(Config.MESH_REMOVAL_COUNT, #candidateMeshes) do
         local meshData = candidateMeshes[i]
         local meshInstance = meshData.instance
         
@@ -145,7 +171,7 @@ local function removeClosestMeshes()
                 end
 
                 pcall(function()
-                    PhysicsService:SetPartCollisionGroup(newPart, COLLISION_GROUP_NAME)
+                    PhysicsService:SetPartCollisionGroup(newPart, Config.COLLISION_GROUP_NAME)
                 end)
 
                 newPart.Parent = meshInstance.Parent
@@ -172,6 +198,8 @@ local function removeClosestMeshes()
 end
 
 local function setSmoothPlastic()
+    if not Config.SMOOTH_PLASTIC_ENABLED then return end
+    
     local player = Players.LocalPlayer
     
     local function handleInstance(instance)
@@ -231,6 +259,8 @@ local function optimizeUI()
 end
 
 local function removeMeshesFromObjects()
+    if not Config.MESH_REMOVAL_ENABLED then return end
+    
     local meshesRemoved = 0
     local partsSimplified = 0
     local processedInstances = {}
@@ -251,7 +281,7 @@ local function removeMeshesFromObjects()
             local instanceName = instance.Name:lower()
             local parentName = instance.Parent and instance.Parent.Name:lower() or ""
 
-            for _, keyword in ipairs(MESH_REMOVAL_KEYWORDS) do
+            for _, keyword in ipairs(Config.MESH_REMOVAL_KEYWORDS) do
                 if instanceName:find(keyword:lower(), 1, true) or parentName:find(keyword:lower(), 1, true) then
                     shouldRemove = true
                     break
@@ -280,7 +310,7 @@ local function removeMeshesFromObjects()
                     end
 
                     pcall(function()
-                        PhysicsService:SetPartCollisionGroup(newPart, COLLISION_GROUP_NAME)
+                        PhysicsService:SetPartCollisionGroup(newPart, Config.COLLISION_GROUP_NAME)
                     end)
 
                     newPart.Parent = instance.Parent
@@ -300,7 +330,7 @@ local function removeMeshesFromObjects()
             local parentName = instance.Parent and instance.Parent.Name:lower() or ""
             local partName = instance.Parent.Name:lower()
 
-            for _, keyword in ipairs(MESH_REMOVAL_KEYWORDS) do
+            for _, keyword in ipairs(Config.MESH_REMOVAL_KEYWORDS) do
                 if instanceName:find(keyword:lower(), 1, true) or parentName:find(keyword:lower(), 1, true) or partName:find(keyword:lower(), 1, true) then
                     shouldRemove = true
                     break
@@ -326,7 +356,7 @@ local function removeMeshesFromObjects()
             local parentName = instance.Parent and instance.Parent.Name:lower() or ""
             local instanceName = instance.Name:lower()
 
-            for _, keyword in ipairs(MESH_REMOVAL_KEYWORDS) do
+            for _, keyword in ipairs(Config.MESH_REMOVAL_KEYWORDS) do
                 if instanceName:find(keyword:lower(), 1, true) or parentName:find(keyword:lower(), 1, true) then
                     shouldRemoveTexture = true
                     break
@@ -356,19 +386,24 @@ local function removeMeshesFromObjects()
     end
 end
 
-local PHYSICS_SLEEP_THRESHOLD = 0.1
-local PHYSICS_MAX_STEERING_FORCE = 10
-local COLLISION_GROUP_NAME = "OptimizedParts"
-
 pcall(function()
-    PhysicsService:CreateCollisionGroup(COLLISION_GROUP_NAME)
-    PhysicsService:CollisionGroupSetCollidable(COLLISION_GROUP_NAME, COLLISION_GROUP_NAME, false)
+    PhysicsService:CreateCollisionGroup(Config.COLLISION_GROUP_NAME)
+    PhysicsService:CollisionGroupSetCollidable(Config.COLLISION_GROUP_NAME, Config.COLLISION_GROUP_NAME, false)
 end)
 
 local function removePlayerAnimations()
+    if not Config.REMOVE_ANIMATIONS then return end
+    
     local localPlayer = LocalPlayer
     local localCharacter = localPlayer.Character
     local localRootPart = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
+    local localHumanoid = localCharacter and localCharacter:FindFirstChildOfClass("Humanoid")
+    
+    -- Check if local player is in first person
+    local isFirstPerson = false
+    if localHumanoid then
+        isFirstPerson = localHumanoid.CameraOffset == Vector3.new(0, 0, 0) and Camera.CameraSubject == localHumanoid
+    end
     
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer then
@@ -377,37 +412,73 @@ local function removePlayerAnimations()
                 local humanoid = character:FindFirstChildOfClass("Humanoid")
                 local rootPart = character:FindFirstChild("HumanoidRootPart")
                 
-                local isFar = true
+                local shouldRemoveAnimations = false
+                local isBehind = false
+                
                 if localRootPart and rootPart then
                     local distance = (localRootPart.Position - rootPart.Position).Magnitude
-                    isFar = distance > MAX_DISTANCE
-                end
-                
-                if isFar and humanoid then
-                    for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
-                        track:Stop()
-                    end
+                    local isFar = distance > Config.MAX_DISTANCE
                     
-                    local animator = humanoid:FindFirstChildOfClass("Animator")
-                    if animator then
-                        animator:Destroy()
+                    -- Calculate if player is behind local player (only in first person)
+                    if isFirstPerson and localRootPart then
+                        local cameraDirection = Camera.CFrame.LookVector
+                        local toPlayerDirection = (rootPart.Position - localRootPart.Position).Unit
+                        local dotProduct = cameraDirection:Dot(toPlayerDirection)
+                        
+                        -- If dot product is negative, player is behind camera view
+                        isBehind = dotProduct < 0
+                        shouldRemoveAnimations = isBehind
+                    else
+                        -- In third person or no first person check, use distance-based removal
+                        shouldRemoveAnimations = isFar
                     end
                 end
                 
+                -- Animation management
+                if humanoid then
+                    if shouldRemoveAnimations then
+                        -- Stop all playing animations
+                        for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+                            track:Stop()
+                        end
+                        
+                        -- Store original animator for potential restoration
+                        if not humanoid:FindFirstChild("OriginalAnimator") then
+                            local animator = humanoid:FindFirstChildOfClass("Animator")
+                            if animator then
+                                local originalMarker = Instance.new("ObjectValue")
+                                originalMarker.Name = "OriginalAnimator"
+                                originalMarker.Value = animator
+                                originalMarker.Parent = humanoid
+                                animator.Parent = nil
+                            end
+                        end
+                    else
+                        -- Restore animations if they were previously removed
+                        local originalAnimatorMarker = humanoid:FindFirstChild("OriginalAnimator")
+                        if originalAnimatorMarker and originalAnimatorMarker.Value then
+                            originalAnimatorMarker.Value.Parent = humanoid
+                            originalAnimatorMarker:Destroy()
+                        end
+                    end
+                end
+                
+                -- Visual optimization based on position
                 for _, part in ipairs(character:GetDescendants()) do
                     if part:IsA("BasePart") then
-                        if isFar then
+                        if shouldRemoveAnimations or (localRootPart and rootPart and (localRootPart.Position - rootPart.Position).Magnitude > Config.MAX_DISTANCE) then
                             part.Material = Enum.Material.SmoothPlastic
                             part.Reflectance = 0
                             part.CastShadow = false
                             
                             pcall(function()
-                                PhysicsService:SetPartCollisionGroup(part, COLLISION_GROUP_NAME)
+                                PhysicsService:SetPartCollisionGroup(part, Config.COLLISION_GROUP_NAME)
                             end)
                         end
                     elseif part:IsA("ParticleEmitter") or part:IsA("Trail") or 
                            part:IsA("Smoke") or part:IsA("Fire") then
-                        part.Enabled = not isFar
+                        part.Enabled = not shouldRemoveAnimations and 
+                                     (localRootPart and rootPart and (localRootPart.Position - rootPart.Position).Magnitude <= Config.MAX_DISTANCE)
                     end
                 end
             end
@@ -416,18 +487,20 @@ local function removePlayerAnimations()
 end
 
 local function applyGraySky()
+    if not Config.GRAY_SKY_ENABLED then return end
+    
     for _, obj in pairs(Lighting:GetChildren()) do
         if obj:IsA("Sky") or obj:IsA("Atmosphere") or obj:IsA("Clouds") then
             obj:Destroy()
         end
     end
     local sky = Instance.new("Sky")
-    sky.SkyboxBk = GRAY_SKY_ID
-    sky.SkyboxDn = GRAY_SKY_ID
-    sky.SkyboxFt = GRAY_SKY_ID
-    sky.SkyboxLf = GRAY_SKY_ID
-    sky.SkyboxRt = GRAY_SKY_ID
-    sky.SkyboxUp = GRAY_SKY_ID
+    sky.SkyboxBk = Config.GRAY_SKY_ID
+    sky.SkyboxDn = Config.GRAY_SKY_ID
+    sky.SkyboxFt = Config.GRAY_SKY_ID
+    sky.SkyboxLf = Config.GRAY_SKY_ID
+    sky.SkyboxRt = Config.GRAY_SKY_ID
+    sky.SkyboxUp = Config.GRAY_SKY_ID
     sky.SunAngularSize = 0
     sky.MoonAngularSize = 0
     sky.StarCount = 0
@@ -435,6 +508,8 @@ local function applyGraySky()
 end
 
 local function applyFullBright()
+    if not Config.FULL_BRIGHT_ENABLED then return end
+    
     Lighting.Brightness = 2
     Lighting.GlobalShadows = false
     Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
@@ -469,7 +544,29 @@ local function optimizeLighting()
     end
 end
 
+local function optimizeLightingAdvanced()
+    local Lighting = game:GetService("Lighting")
+    
+    Lighting.GlobalShadows = false
+    Lighting.Brightness = 2
+    Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+    Lighting.Ambient = Color3.new(1, 1, 1)
+    Lighting.ExposureCompensation = 0
+    
+    for _, effect in pairs(Lighting:GetChildren()) do
+        if effect:IsA("BlurEffect") or 
+           effect:IsA("ColorCorrectionEffect") or 
+           effect:IsA("SunRaysEffect") or
+           effect:IsA("BloomEffect") or
+           effect:IsA("DepthOfFieldEffect") then
+            effect:Destroy()
+        end
+    end
+end
+
 local function convertToLowPoly()
+    if not Config.LOW_POLY_CONVERSION then return end
+    
     local replacementPrimitives = {
         "Ball", "Block", "Cylinder", "Wedge"
     }
@@ -619,7 +716,7 @@ local function removeReflectionsAndOptimize()
             end
             
             pcall(function()
-                PhysicsService:SetPartCollisionGroup(obj, COLLISION_GROUP_NAME)
+                PhysicsService:SetPartCollisionGroup(obj, Config.COLLISION_GROUP_NAME)
             end)
             
             if obj:GetPropertyChangedSignal("AssemblyLinearVelocity") then
@@ -637,6 +734,8 @@ local function removeReflectionsAndOptimize()
 end
 
 local function disableConstraints()
+    if not Config.DISABLE_CONSTRAINTS then return end
+    
     for _, c in ipairs(workspace:GetDescendants()) do
         if (c:IsA("AlignPosition") or c:IsA("AlignOrientation") or c:IsA("Motor") or c:IsA("HingeConstraint") or c:IsA("RodConstraint")) and not shouldSkip(c) then
             pcall(function()
@@ -647,6 +746,8 @@ local function disableConstraints()
 end
 
 local function throttleTextures()
+    if not Config.THROTTLE_TEXTURES then return end
+    
     for _, t in ipairs(workspace:GetDescendants()) do
         if (t:IsA("Decal") or t:IsA("Texture") or t:IsA("ImageLabel") or t:IsA("ImageButton")) and not shouldSkip(t) then
             pcall(function()
@@ -659,7 +760,9 @@ local function throttleTextures()
 end
 
 local function optimizePhysics()
-    settings().Rendering.QualityLevel = 1
+    if not Config.OPTIMIZE_PHYSICS then return end
+    
+    settings().Rendering.QualityLevel = Config.QUALITY_LEVEL
     settings().Physics.PhysicsEnvironmentalThrottle = 2
     
     for _, part in pairs(workspace:GetDescendants()) do
@@ -676,6 +779,8 @@ local function optimizePhysics()
 end
 
 local function throttleParticles()
+    if not Config.THROTTLE_PARTICLES then return end
+    
     for _, p in ipairs(workspace:GetDescendants()) do
         if p:IsA("ParticleEmitter") and not shouldSkip(p) then
             pcall(function()
@@ -685,85 +790,18 @@ local function throttleParticles()
     end
 end
 
-local function forcePhysicsSleep()
-    for _, part in pairs(workspace:GetDescendants()) do
-        if part:IsA("BasePart") and not part.Anchored then
-            local velocity = part.AssemblyLinearVelocity.Magnitude
-            local angularVelocity = part.AssemblyAngularVelocity.Magnitude
-            
-            if velocity < 0.1 and angularVelocity < 0.1 then
-                part.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                part.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-            end
-        end
-    end
-end
-
-local function applyCulling()
-    local maxDistance = 400 -- Anything further than this gets hidden
-    local fovAngle = 100 -- Field of view cone in degrees
-    local cam = Camera
-
-    for _, part in pairs(workspace:GetDescendants()) do
-        if part:IsA("BasePart") and part:IsDescendantOf(workspace) and part.Transparency < 1 and part.CanCollide then
-            local pos, onScreen = cam:WorldToViewportPoint(part.Position)
-            local dirToPart = (part.Position - cam.CFrame.Position).Unit
-            local camDir = cam.CFrame.LookVector
-            local angle = math.deg(math.acos(math.clamp(camDir:Dot(dirToPart), -1, 1)))
-            local dist = (cam.CFrame.Position - part.Position).Magnitude
-
-            if onScreen and angle < fovAngle and dist < maxDistance then
-                part.LocalTransparencyModifier = 0
-            else
-                part.LocalTransparencyModifier = 1
-            end
-        end
-    end
-end
-
-local function rateLimitedOptimize()
-    local currentTime = tick()
-    if currentTime - lastRunTime >= MIN_INTERVAL then
-        selectiveOptimize()
-        lastRunTime = currentTime
-    end
-end
-
-local function optimizes()
+local function Core()
     settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
     settings().Physics.AllowSleep = true
-    settings().Rendering.QualityLevel = 1
-    settings().Rendering.EagerBulkExecution = false
-    settings().Rendering.TextureQuality = Enum.TextureQuality.Low
-    settings().Physics.PhysicsEnvironmentalThrottle = 2
-    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    settings().Rendering.QualityLevel = Config.QUALITY_LEVEL
     settings().Rendering.EagerBulkExecution = true
     settings().Rendering.EnableFRM = true
     settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level01
     settings().Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalPhysicsThrottle.Disabled
-    settings().Physics.ThrottleAdjustTime = 10
+    settings().Rendering.TextureQuality = Enum.TextureQuality.Low
+    
     if setfpscap then
-        setfpscap(1000)
-    end
-end
-
-local function optimizeLightingAdvanced()
-    local Lighting = game:GetService("Lighting")
-    
-    Lighting.GlobalShadows = false
-    Lighting.Brightness = 2
-    Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
-    Lighting.Ambient = Color3.new(1, 1, 1)
-    Lighting.ExposureCompensation = 0
-    
-    for _, effect in pairs(Lighting:GetChildren()) do
-        if effect:IsA("BlurEffect") or 
-           effect:IsA("ColorCorrectionEffect") or 
-           effect:IsA("SunRaysEffect") or
-           effect:IsA("BloomEffect") or
-           effect:IsA("DepthOfFieldEffect") then
-            effect:Destroy()
-        end
+        setfpscap(Config.FPS_CAP)
     end
 end
 
@@ -784,7 +822,91 @@ local function removeAllTextures()
     end
 end
 
+local function initializeCollisionGroups()
+    local success = pcall(function()
+        PhysicsService:CreateCollisionGroup(Config.COLLISION_GROUP_NAME)
+        PhysicsService:CollisionGroupSetCollidable(Config.COLLISION_GROUP_NAME, Config.COLLISION_GROUP_NAME, false)
+        PhysicsService:CollisionGroupSetCollidable(Config.COLLISION_GROUP_NAME, "Default", false)
+    end)
+    if not success then
+        warn("Failed to initialize collision groups")
+    end
+end
+
+local function binmem()
+    local memory = collectgarbage("count")
+    if memory > Config.MEMORY_CLEANUP_THRESHOLD then
+        collectgarbage("collect")
+    end
+end
+
+local function selectiveTextureRemoval()
+    if not Config.SELECTIVE_TEXTURE_REMOVAL then return end
+    
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if (obj:IsA("Decal") or obj:IsA("Texture")) and not shouldSkip(obj) then
+            local shouldPreserve = false
+            
+            if Config.PRESERVE_IMPORTANT_TEXTURES then
+                local objName = obj.Name:lower()
+                local parentName = obj.Parent and obj.Parent.Name:lower() or ""
+                
+                for _, keyword in ipairs(Config.IMPORTANT_TEXTURE_KEYWORDS) do
+                    if objName:find(keyword:lower()) or parentName:find(keyword:lower()) then
+                        shouldPreserve = true
+                        break
+                    end
+                end
+            end
+            
+            if not shouldPreserve then
+                pcall(function()
+                    obj.Transparency = 1
+                end)
+            end
+        end
+    end
+end
+
+local function monitorPerformance()
+    if not Config.PERFORMANCE_MONITORING then return end
+    
+    local currentFPS = 1 / RunService.RenderStepped:Wait()
+    
+    if currentFPS < Config.FPS_THRESHOLD then
+        Config.QUALITY_LEVEL = 1
+        Config.MAX_DISTANCE = math.max(Config.MAX_DISTANCE - 10, 20)
+        applya()
+    end
+end
+
+local function optimizeUIAdvanced()
+    local coreGui = game:GetService("CoreGui")
+    
+    -- Optimize CoreGui
+    for _, gui in ipairs(coreGui:GetDescendants()) do
+        if gui:IsA("ImageLabel") or gui:IsA("ImageButton") then
+            gui.ImageTransparency = 0.3
+        elseif gui:IsA("Frame") then
+            gui.BackgroundTransparency = 0.5
+        end
+    end
+    
+    -- Optimize player GUIs
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player:FindFirstChild("PlayerGui") then
+            for _, gui in ipairs(player.PlayerGui:GetDescendants()) do
+                if gui:IsA("ImageLabel") or gui:IsA("ImageButton") then
+                    pcall(function() gui.ImageTransparency = 0.5 end)
+                end
+            end
+        end
+    end
+end
+
 local function applya()
+    if not Config.ENABLED then return end
+    
     applyGraySky()
     applyFullBright()
     simplifyTerrain()
@@ -796,12 +918,17 @@ local function applya()
     removePlayerAnimations()
     convertToLowPoly()
     removeMeshesFromObjects()
-    optimizes()
+    Core()
+    optimizeUIAdvanced()
     disableConstraints()
     throttleParticles()
     throttleTextures()
     optimizeUI()
     removeAllTextures()
+    initializeCollisionGroups()
+    binmem()
+    selectiveTextureRemoval()
+    monitorPerformance()
 end
 
 applya()
@@ -823,13 +950,13 @@ end
 
 local function mainOptimizationLoop()
     local lastHeavyOptimization = 0
-    local HEAVY_OPTIMIZATION_INTERVAL = 10 -- seconds
+    local HEAVY_OPTIMIZATION_INTERVAL = 20 -- seconds
     
     while Running do
         local currentTime = tick()
         
         -- Check if it's time for timed mesh removal (every 20 seconds)
-        if currentTime - lastMeshRemovalTime >= MESH_REMOVAL_INTERVAL then
+        if currentTime - lastMeshRemovalTime >= Config.MESH_REMOVAL_INTERVAL then
             safeCall(removeClosestMeshes, "timed_mesh_removal")
             lastMeshRemovalTime = currentTime
         end
@@ -837,14 +964,12 @@ local function mainOptimizationLoop()
         if currentTime - lastHeavyOptimization >= HEAVY_OPTIMIZATION_INTERVAL then
             safeCall(applya, "heavy_optimization")
             safeCall(removeMeshesFromObjects, "mesh_removal")
-            safeCall(forcePhysicsSleep, "physics_sleep")
             lastHeavyOptimization = currentTime
         end
         
         safeCall(removePlayerAnimations, "player_animations")
-        safeCall(applyCulling, "culling")
         
-        task.wait(0.5) -- Frame rate cap
+        task.wait(Config.OPTIMIZATION_INTERVAL)
     end
 end
 
@@ -854,3 +979,10 @@ local function stopOptimizations()
     Running = false
     print("Optimizations stopped")
 end
+
+-- Export configuration for external access
+return {
+    Config = Config,
+    stopOptimizations = stopOptimizations,
+    applyOptimizations = applya
+}
