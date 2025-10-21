@@ -8,18 +8,14 @@ local workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Configuration Table
+-- config yea you can edit this to your liking if you hate the over optimization
 local Config = {
-    -- Optimization Settings
     ENABLED = true,
-    OPTIMIZATION_INTERVAL = 5,
-    MIN_INTERVAL = 1,
+    OPTIMIZATION_INTERVAL = 30,
+    MIN_INTERVAL = 3,
     MAX_DISTANCE = 50,
     PERFORMANCE_MONITORING = true,
     FPS_THRESHOLD = 30,
-    MESH_REMOVAL_ENABLED = true,
-    MESH_REMOVAL_INTERVAL = 15,
-    MESH_REMOVAL_COUNT = 30,
     GRAY_SKY_ENABLED = true,
     GRAY_SKY_ID = "rbxassetid://114666145996289",
     FULL_BRIGHT_ENABLED = true,
@@ -33,31 +29,10 @@ local Config = {
     LOW_POLY_CONVERSION = true,
     SELECTIVE_TEXTURE_REMOVAL = true,
     PRESERVE_IMPORTANT_TEXTURES = true,
-    IMPORTANT_TEXTURE_KEYWORDS = {"sign", "ui", "hud", "menu", "button"},
+    IMPORTANT_TEXTURE_KEYWORDS = {"sign", "ui", "hud", "menu", "button", "fence"},
     QUALITY_LEVEL = 1,
     FPS_CAP = 1000,
     MEMORY_CLEANUP_THRESHOLD = 500,
-    
-    -- Mesh Removal Keywords
-    MESH_REMOVAL_KEYWORDS = {
-        "chair", "Chair", "seat", "Seat", "stool", "Stool", "bench", "Bench", 
-        "coffee", "fruit", "paper", "Paper", "document", "Document", "note", "Note", 
-        "cup", "mug", "photo", "monitor", "Monitor", "screen", "Screen", "display", "Display", 
-        "pistol", "rifle", "plate", "computer", "Computer", "laptop", "Laptop",  "Barrel", "barrel",
-        "desktop", "Desktop", "bedframe", "table", "Table", "desk", "Desk",  "Plank", "plank", "Cloud",
-        "furniture", "Furniture", "bottle", "cardboard", "Chest", "book", "Book", "Pillow", "pillow",
-        "books", "Books", "notebook", "Notebook", "magazine", "Magazine", "poster", "Poster", "cloud",
-        "sign", "Sign", "billboard", "Billboard", "keyboard", "Keyboard", "picture", "Picture", 
-        "frame", "Frame", "painting", "Painting", "pipe", "wires", "fridge", "glass", "Glass", 
-        "window", "Window", "pane", "Pane", "shelf", "phone", "tree", "Tree", "bush", "Bush", 
-        "plant", "Plant", "foliage", "Foliage", "Boxes", "decor", "Decor", "ornament", "Ornament", 
-        "detail", "Detail", "knob", "Handle", "mesh", "Mesh", "model", "Model", "part", "Part"
-    },
-    
-    -- Complex Mesh Types
-    COMPLEX_MESH_TYPES = {
-        "FileMesh", "SpecialMesh", "MeshPart"
-    }
 }
 
 local function safeCall(func, name, ...)
@@ -70,132 +45,6 @@ end
 
 -- stuff
 local Running = Config.ENABLED
-local lastRunTime = 0
-local lastMeshRemovalTime = 0
-
--- New function to remove closest meshes based on keywords
-local function removeClosestMeshes()
-    if not Config.MESH_REMOVAL_ENABLED then return 0 end
-    
-    local meshesRemoved = 0
-    local processedInstances = {}
-    local candidateMeshes = {}
-    
-    local localPlayerPos
-    if LocalPlayer and LocalPlayer.Character then
-        local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if rootPart then
-            localPlayerPos = rootPart.Position
-        end
-    end
-    
-    if not localPlayerPos then
-        return 0
-    end
-    
-    -- Collect all candidate meshes
-    for _, instance in ipairs(workspace:GetDescendants()) do
-        if not processedInstances[instance] and not shouldSkip(instance) then
-            processedInstances[instance] = true
-            
-            local isMesh = false
-            local meshInstance = nil
-            
-            if instance:IsA("MeshPart") then
-                isMesh = true
-                meshInstance = instance
-            elseif (instance:IsA("SpecialMesh") or instance:IsA("FileMesh")) and instance.Parent and instance.Parent:IsA("BasePart") then
-                isMesh = true
-                meshInstance = instance
-            end
-            
-            if isMesh and meshInstance then
-                local shouldRemove = false
-                local instanceName = meshInstance.Name:lower()
-                local parentName = meshInstance.Parent and meshInstance.Parent.Name:lower() or ""
-                
-                -- Check if mesh matches any keywords
-                for _, keyword in ipairs(Config.MESH_REMOVAL_KEYWORDS) do
-                    if instanceName:find(keyword:lower(), 1, true) or parentName:find(keyword:lower(), 1, true) then
-                        shouldRemove = true
-                        break
-                    end
-                end
-                
-                if shouldRemove then
-                    local meshPos
-                    if meshInstance:IsA("MeshPart") then
-                        meshPos = meshInstance.Position
-                    else
-                        meshPos = meshInstance.Parent.Position
-                    end
-                    
-                    local distance = (localPlayerPos - meshPos).Magnitude
-                    
-                    table.insert(candidateMeshes, {
-                        instance = meshInstance,
-                        distance = distance
-                    })
-                end
-            end
-        end
-    end
-    
-    table.sort(candidateMeshes, function(a, b)
-        return a.distance < b.distance
-    end)
-    
-    for i = 1, math.min(Config.MESH_REMOVAL_COUNT, #candidateMeshes) do
-        local meshData = candidateMeshes[i]
-        local meshInstance = meshData.instance
-        
-        local success, err = pcall(function()
-            if meshInstance:IsA("MeshPart") then
-                local newPart = Instance.new("Part")
-                newPart.Name = "Simplified_" .. meshInstance.Name
-                newPart.Size = meshInstance.Size
-                newPart.CFrame = meshInstance.CFrame
-                newPart.Color = Color3.new(0.5, 0.5, 0.5)
-                newPart.Material = Enum.Material.SmoothPlastic
-                newPart.Transparency = meshInstance.Transparency
-                newPart.Anchored = meshInstance.Anchored
-                newPart.CanCollide = meshInstance.CanCollide
-                newPart.CastShadow = false
-                newPart.Reflectance = 0
-                
-                for _, child in ipairs(meshInstance:GetChildren()) do
-                    if child:IsA("Weld") or child:IsA("WeldConstraint") or 
-                       child:IsA("Attachment") or child:IsA("Motor6D") then
-                        child:Clone().Parent = newPart
-                    end
-                end
-
-                pcall(function()
-                    PhysicsService:SetPartCollisionGroup(newPart, Config.COLLISION_GROUP_NAME)
-                end)
-
-                newPart.Parent = meshInstance.Parent
-                meshInstance:Destroy()
-            else
-                meshInstance.Parent.Color = Color3.new(0.5, 0.5, 0.5)
-                meshInstance.Parent.Material = Enum.Material.SmoothPlastic
-                meshInstance:Destroy()
-            end
-            
-            meshesRemoved += 1
-        end)
-
-        if not success then
-            warn(string.format("Failed to remove mesh %s: %s", meshInstance:GetFullName(), err))
-        end
-    end
-    
-    if meshesRemoved > 0 then
-        print(string.format("Timed mesh removal: %d closest meshes removed", meshesRemoved))
-    end
-    
-    return meshesRemoved
-end
 
 local function setSmoothPlastic()
     if not Config.SMOOTH_PLASTIC_ENABLED then return end
@@ -222,6 +71,109 @@ local function setSmoothPlastic()
     Workspace.DescendantAdded:Connect(handleInstance)
 end
 setSmoothPlastic()
+
+local function RemoveMesh(target)
+    local textureKeywords = {
+        "chair", "seat", "stool", "bench", "coffee", "fruit", "paper", "document", 
+        "note", "cup", "mug", "photo", "monitor", "screen", "display", "pistol", 
+        "rifle", "plate", "computer", "laptop", "desktop", "bedframe", "table", 
+        "desk", "plank", "cloud", "furniture", "bottle", "cardboard", "chest", 
+        "book", "pillow", "magazine", "poster", "sign", "billboard", "keyboard", 
+        "picture", "frame", "painting", "pipe", "wires", "fridge", "glass", "leaf",
+        "window", "pane", "shelf", "phone", "tree", "bush", "plant", "foliage", 
+        "boxes", "decor", "ornament", "detail", "knob", "handle", "wall", "tree",
+        "prop", "object", "tool", "weapon", "food", "drink", "bloxy", "cola",
+        "container", "box", "bag", "case", "stand", "rack", "holder", "support",
+        "leg", "arm", "back", "top", "base", "cover", "lid", "door", "drawer",
+        "handle", "knob", "button", "switch", "lever", "wheel", "chain", "door",
+        "rope", "wire", "cable", "tube", "hose", "vent", "fan", "motor", "engine",
+        "machine", "equipment", "device", "bottle", "closet", "potplant", "balloons",
+    }
+    
+    local function hasTextureKeyword(name)
+        local lowerName = string.lower(name)
+        for _, keyword in ipairs(textureKeywords) do
+            if string.find(lowerName, keyword:lower()) then
+                return true
+            end
+        end
+        return false
+    end
+    
+    local function isLocalPlayer(instance)
+        local players = game:GetService("Players")
+        local localPlayer = players.LocalPlayer
+        if localPlayer and localPlayer.Character then
+            if instance:IsDescendantOf(localPlayer.Character) then
+                return true
+            end
+        end
+        
+        for _, player in ipairs(players:GetPlayers()) do
+            if player.Character and instance:IsDescendantOf(player.Character) then
+                return true
+            end
+        end
+        
+        return false
+    end
+    
+    local function processInstance(instance)
+        if isLocalPlayer(instance) then
+            return
+        end
+        
+        if instance:IsA("BasePart") then
+            if hasTextureKeyword(instance.Name) then
+                local decal = instance:FindFirstChildWhichIsA("Decal")
+                if decal then
+                    decal:Destroy()
+                end
+                
+                for _, child in ipairs(instance:GetChildren()) do
+                    if child:IsA("Decal") then
+                        child:Destroy()
+                    end
+                end
+                
+                instance.BrickColor = BrickColor.new("Medium stone grey")
+                instance.Material = Enum.Material.Plastic
+                
+                if instance:IsA("Part") then
+                    instance.TopSurface = Enum.SurfaceType.Smooth
+                    instance.BottomSurface = Enum.SurfaceType.Smooth
+                    instance.LeftSurface = Enum.SurfaceType.Smooth
+                    instance.RightSurface = Enum.SurfaceType.Smooth
+                    instance.FrontSurface = Enum.SurfaceType.Smooth
+                    instance.BackSurface = Enum.SurfaceType.Smooth
+                end
+            end
+        elseif instance:IsA("Model") then
+            for _, child in ipairs(instance:GetChildren()) do
+                processInstance(child)
+            end
+        end
+    end
+    
+    if target then
+        if target:IsA("Model") or target:IsA("BasePart") then
+            if not isLocalPlayer(target) then
+                processInstance(target)
+            else
+                warn("RemoveMesh: Cannot process local player")
+            end
+        else
+            warn("RemoveMesh: Target must be a Model or BasePart")
+        end
+    else
+        for _, obj in ipairs(workspace:GetChildren()) do
+            if (obj:IsA("Model") or obj:IsA("BasePart")) and not isLocalPlayer(obj) then
+                processInstance(obj)
+            end
+        end
+    end
+end
+RemoveMesh()
 
 local function fpsc()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/hm5650/Fps-counter/refs/heads/main/Fpsc", true))()
@@ -258,134 +210,6 @@ local function optimizeUI()
     end
 end
 
-local function removeMeshesFromObjects()
-    if not Config.MESH_REMOVAL_ENABLED then return end
-    
-    local meshesRemoved = 0
-    local partsSimplified = 0
-    local processedInstances = {}
-
-    local function isValidInstance(instance)
-        return instance and instance.Parent and not processedInstances[instance]
-    end
-
-    for _, instance in ipairs(workspace:GetDescendants()) do
-        if not isValidInstance(instance) or shouldSkip(instance) then
-            continue
-        end
-
-        processedInstances[instance] = true
-
-        if instance:IsA("MeshPart") then
-            local shouldRemove = false
-            local instanceName = instance.Name:lower()
-            local parentName = instance.Parent and instance.Parent.Name:lower() or ""
-
-            for _, keyword in ipairs(Config.MESH_REMOVAL_KEYWORDS) do
-                if instanceName:find(keyword:lower(), 1, true) or parentName:find(keyword:lower(), 1, true) then
-                    shouldRemove = true
-                    break
-                end
-            end
-
-            if shouldRemove then
-                local success, err = pcall(function()
-                    local newPart = Instance.new("Part")
-                    newPart.Name = "Simplified_" .. instance.Name
-                    newPart.Size = instance.Size
-                    newPart.CFrame = instance.CFrame
-                    newPart.Color = Color3.new(0.5, 0.5, 0.5)
-                    newPart.Material = Enum.Material.SmoothPlastic
-                    newPart.Transparency = instance.Transparency
-                    newPart.Anchored = instance.Anchored
-                    newPart.CanCollide = instance.CanCollide
-                    newPart.CastShadow = false
-                    newPart.Reflectance = 0
-                    
-                    for _, child in ipairs(instance:GetChildren()) do
-                        if child:IsA("Weld") or child:IsA("WeldConstraint") or 
-                           child:IsA("Attachment") or child:IsA("Motor6D") then
-                            child:Clone().Parent = newPart
-                        end
-                    end
-
-                    pcall(function()
-                        PhysicsService:SetPartCollisionGroup(newPart, Config.COLLISION_GROUP_NAME)
-                    end)
-
-                    newPart.Parent = instance.Parent
-                    instance:Destroy()
-                    partsSimplified += 1
-                end)
-
-                if not success then
-                    warn(string.format("Failed to process MeshPart %s: %s", instance:GetFullName(), err))
-                end
-            end
-        end
-        
-        if (instance:IsA("SpecialMesh") or instance:IsA("FileMesh")) and instance.Parent and instance.Parent:IsA("BasePart") then
-            local shouldRemove = false
-            local instanceName = instance.Name:lower()
-            local parentName = instance.Parent and instance.Parent.Name:lower() or ""
-            local partName = instance.Parent.Name:lower()
-
-            for _, keyword in ipairs(Config.MESH_REMOVAL_KEYWORDS) do
-                if instanceName:find(keyword:lower(), 1, true) or parentName:find(keyword:lower(), 1, true) or partName:find(keyword:lower(), 1, true) then
-                    shouldRemove = true
-                    break
-                end
-            end
-
-            if shouldRemove then
-                local success, err = pcall(function()
-                    instance.Parent.Color = Color3.new(0.5, 0.5, 0.5)
-                    instance.Parent.Material = Enum.Material.SmoothPlastic
-                    instance:Destroy()
-                    meshesRemoved += 1
-                end)
-
-                if not success then
-                    warn(string.format("Failed to process mesh %s: %s", instance:GetFullName(), err))
-                end
-            end
-        end
-        
-        if instance:IsA("SurfaceAppearance") or instance:IsA("Decal") or instance:IsA("Texture") then
-            local shouldRemoveTexture = false
-            local parentName = instance.Parent and instance.Parent.Name:lower() or ""
-            local instanceName = instance.Name:lower()
-
-            for _, keyword in ipairs(Config.MESH_REMOVAL_KEYWORDS) do
-                if instanceName:find(keyword:lower(), 1, true) or parentName:find(keyword:lower(), 1, true) then
-                    shouldRemoveTexture = true
-                    break
-                end
-            end
-
-            if shouldRemoveTexture then
-                local success, err = pcall(function()
-                    if instance:IsA("Decal") or instance:IsA("Texture") then
-                        instance.Transparency = 1
-                    else
-                        instance:Destroy()
-                    end
-                end)
-
-                if not success then
-                    warn(string.format("Failed to process texture %s: %s", instance:GetFullName(), err))
-                end
-            end
-        end
-    end
-
-    if meshesRemoved > 0 or partsSimplified > 0 then
-        print(string.format("Mesh removal: %d meshes removed, %d parts simplified", meshesRemoved, partsSimplified))
-    else
-        print("No meshes or parts were processed for removal.")
-    end
-end
-
 pcall(function()
     PhysicsService:CreateCollisionGroup(Config.COLLISION_GROUP_NAME)
     PhysicsService:CollisionGroupSetCollidable(Config.COLLISION_GROUP_NAME, Config.COLLISION_GROUP_NAME, false)
@@ -399,7 +223,6 @@ local function removePlayerAnimations()
     local localRootPart = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
     local localHumanoid = localCharacter and localCharacter:FindFirstChildOfClass("Humanoid")
     
-    -- Check if local player is in first person
     local isFirstPerson = false
     if localHumanoid then
         isFirstPerson = localHumanoid.CameraOffset == Vector3.new(0, 0, 0) and Camera.CameraSubject == localHumanoid
@@ -419,30 +242,24 @@ local function removePlayerAnimations()
                     local distance = (localRootPart.Position - rootPart.Position).Magnitude
                     local isFar = distance > Config.MAX_DISTANCE
                     
-                    -- Calculate if player is behind local player (only in first person)
                     if isFirstPerson and localRootPart then
                         local cameraDirection = Camera.CFrame.LookVector
                         local toPlayerDirection = (rootPart.Position - localRootPart.Position).Unit
                         local dotProduct = cameraDirection:Dot(toPlayerDirection)
                         
-                        -- If dot product is negative, player is behind camera view
                         isBehind = dotProduct < 0
                         shouldRemoveAnimations = isBehind
                     else
-                        -- In third person or no first person check, use distance-based removal
                         shouldRemoveAnimations = isFar
                     end
                 end
                 
-                -- Animation management
                 if humanoid then
                     if shouldRemoveAnimations then
-                        -- Stop all playing animations
                         for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
                             track:Stop()
                         end
                         
-                        -- Store original animator for potential restoration
                         if not humanoid:FindFirstChild("OriginalAnimator") then
                             local animator = humanoid:FindFirstChildOfClass("Animator")
                             if animator then
@@ -454,7 +271,6 @@ local function removePlayerAnimations()
                             end
                         end
                     else
-                        -- Restore animations if they were previously removed
                         local originalAnimatorMarker = humanoid:FindFirstChild("OriginalAnimator")
                         if originalAnimatorMarker and originalAnimatorMarker.Value then
                             originalAnimatorMarker.Value.Parent = humanoid
@@ -463,7 +279,6 @@ local function removePlayerAnimations()
                     end
                 end
                 
-                -- Visual optimization based on position
                 for _, part in ipairs(character:GetDescendants()) do
                     if part:IsA("BasePart") then
                         if shouldRemoveAnimations or (localRootPart and rootPart and (localRootPart.Position - rootPart.Position).Magnitude > Config.MAX_DISTANCE) then
@@ -883,7 +698,6 @@ end
 local function optimizeUIAdvanced()
     local coreGui = game:GetService("CoreGui")
     
-    -- Optimize CoreGui
     for _, gui in ipairs(coreGui:GetDescendants()) do
         if gui:IsA("ImageLabel") or gui:IsA("ImageButton") then
             gui.ImageTransparency = 0.3
@@ -892,7 +706,6 @@ local function optimizeUIAdvanced()
         end
     end
     
-    -- Optimize player GUIs
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player:FindFirstChild("PlayerGui") then
             for _, gui in ipairs(player.PlayerGui:GetDescendants()) do
@@ -903,6 +716,39 @@ local function optimizeUIAdvanced()
         end
     end
 end
+
+local function removeOtherPlayerAccessories()
+    if not localPlayer then
+        warn("LocalPlayer not available yet.")
+        return
+    end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            local character = player.Character
+
+            if character then
+                for _, descendant in ipairs(character:GetChildren()) do
+                    if descendant:IsA("Accessory") then
+                        descendant:Destroy()
+                    end
+                end
+            end
+        end
+    end
+
+    print("Accessories removed from other players' characters.")
+end
+
+Players.PlayerAdded:Connect(function(player)
+    if player ~= localPlayer then
+        player.CharacterAdded:Connect(function()
+            task.wait(0.5) 
+            removeOtherPlayerAccessories()
+        end)
+    end
+end)
+removeOtherPlayerAccessories()
 
 local function applya()
     if not Config.ENABLED then return end
@@ -917,7 +763,6 @@ local function applya()
     setSmoothPlastic()
     removePlayerAnimations()
     convertToLowPoly()
-    removeMeshesFromObjects()
     Core()
     optimizeUIAdvanced()
     disableConstraints()
@@ -929,7 +774,9 @@ local function applya()
     binmem()
     selectiveTextureRemoval()
     monitorPerformance()
+    RemoveMesh()
 end
+
 
 applya()
 
@@ -955,15 +802,8 @@ local function mainOptimizationLoop()
     while Running do
         local currentTime = tick()
         
-        -- Check if it's time for timed mesh removal (every 20 seconds)
-        if currentTime - lastMeshRemovalTime >= Config.MESH_REMOVAL_INTERVAL then
-            safeCall(removeClosestMeshes, "timed_mesh_removal")
-            lastMeshRemovalTime = currentTime
-        end
-        
         if currentTime - lastHeavyOptimization >= HEAVY_OPTIMIZATION_INTERVAL then
             safeCall(applya, "heavy_optimization")
-            safeCall(removeMeshesFromObjects, "mesh_removal")
             lastHeavyOptimization = currentTime
         end
         
@@ -980,7 +820,6 @@ local function stopOptimizations()
     print("Optimizations stopped")
 end
 
--- Export configuration for external access
 return {
     Config = Config,
     stopOptimizations = stopOptimizations,
