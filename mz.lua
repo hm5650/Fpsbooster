@@ -209,7 +209,7 @@ local function Main(ExternalConfig)
     		ScreenGui:Destroy()
     	end)
     end
-    UpdateLogs()
+    UpdateLog()
     local function RemoveMesh(target)
         local textureKeywords = {
             "chair", "seat", "stool", "bench", "coffee", "fruit", "paper", "document", 
