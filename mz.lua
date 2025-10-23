@@ -3,6 +3,7 @@
 local Config = {
     ENABLED = true,
     OPTIMIZATION_INTERVAL = 30,
+    SHOW_UPDATELOG = true,
     MIN_INTERVAL = 3,
     MAX_DISTANCE = 50,
     PERFORMANCE_MONITORING = true,
@@ -24,9 +25,6 @@ local Config = {
     QUALITY_LEVEL = 1,
     FPS_CAP = 1000,
     MEMORY_CLEANUP_THRESHOLD = 500,
-    REMOVE_MESH = true,
-    REMOVE_CLOTHING = true,
-    REDUCE_NETWORK_TRAFFIC = true,
 }
 
 local function Main(ExternalConfig)
@@ -80,235 +78,139 @@ local function Main(ExternalConfig)
         Workspace.DescendantAdded:Connect(handleInstance)
     end
     setSmoothPlastic()
-
-
-    local function createUpdateLogGUI()
-        if not Config.SHOW_UPDATELOG then return end
-        
-        local Players = game:GetService("Players")
-        local CoreGui = game:GetService("CoreGui")
-        local TweenService = game:GetService("TweenService")
-        
-        local LocalPlayer = Players.LocalPlayer
-        if not LocalPlayer then return end
-        
-        -- Create main frame
-        local ScreenGui = Instance.new("ScreenGui")
-        local MainFrame = Instance.new("Frame")
-        local Title = Instance.new("TextLabel")
-        local ScrollFrame = Instance.new("ScrollingFrame")
-        local ConfigList = Instance.new("UIListLayout")
-        local CloseButton = Instance.new("TextButton")
-        local CopyAllButton = Instance.new("TextButton")
-        
-        ScreenGui.Name = "AntiLagUpdateLog"
-        ScreenGui.Parent = CoreGui
-        ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-        
-        MainFrame.Name = "MainFrame"
-        MainFrame.Size = UDim2.new(0, 400, 0, 500)
-        MainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
-        MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-        MainFrame.BorderSizePixel = 0
-        MainFrame.ClipsDescendants = true
-        MainFrame.Parent = ScreenGui
-        
-        local UICorner = Instance.new("UICorner")
-        UICorner.CornerRadius = UDim.new(0, 8)
-        UICorner.Parent = MainFrame
-        
-        local UIStroke = Instance.new("UIStroke")
-        UIStroke.Color = Color3.fromRGB(100, 100, 200)
-        UIStroke.Thickness = 2
-        UIStroke.Parent = MainFrame
-        
-        Title.Name = "Title"
-        Title.Size = UDim2.new(1, 0, 0, 40)
-        Title.Position = UDim2.new(0, 0, 0, 0)
-        Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-        Title.BorderSizePixel = 0
-        Title.Text = "🔄 Anti-Lag Update Log"
-        Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-        Title.TextSize = 18
-        Title.Font = Enum.Font.GothamBold
-        Title.Parent = MainFrame
-        
-        local TitleCorner = Instance.new("UICorner")
-        TitleCorner.CornerRadius = UDim.new(0, 8)
-        TitleCorner.Parent = Title
-        
-        ScrollFrame.Name = "ScrollFrame"
-        ScrollFrame.Size = UDim2.new(1, -20, 1, -120)
-        ScrollFrame.Position = UDim2.new(0, 10, 0, 50)
-        ScrollFrame.BackgroundTransparency = 1
-        ScrollFrame.BorderSizePixel = 0
-        ScrollFrame.ScrollBarThickness = 6
-        ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-        ScrollFrame.Parent = MainFrame
-        
-        ConfigList.Name = "ConfigList"
-        ConfigList.Padding = UDim.new(0, 5)
-        ConfigList.Parent = ScrollFrame
-        
-        CopyAllButton.Name = "CopyAllButton"
-        CopyAllButton.Size = UDim2.new(1, -20, 0, 35)
-        CopyAllButton.Position = UDim2.new(0, 10, 1, -80)
-        CopyAllButton.BackgroundColor3 = Color3.fromRGB(60, 120, 60)
-        CopyAllButton.BorderSizePixel = 0
-        CopyAllButton.Text = "📋 Copy All Config Variables"
-        CopyAllButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        CopyAllButton.TextSize = 14
-        CopyAllButton.Font = Enum.Font.GothamBold
-        CopyAllButton.Parent = MainFrame
-        
-        local CopyCorner = Instance.new("UICorner")
-        CopyCorner.CornerRadius = UDim.new(0, 6)
-        CopyCorner.Parent = CopyAllButton
-        
-        CloseButton.Name = "CloseButton"
-        CloseButton.Size = UDim2.new(1, -20, 0, 35)
-        CloseButton.Position = UDim2.new(0, 10, 1, -35)
-        CloseButton.BackgroundColor3 = Color3.fromRGB(120, 60, 60)
-        CloseButton.BorderSizePixel = 0
-        CloseButton.Text = "❌ Close"
-        CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        CloseButton.TextSize = 14
-        CloseButton.Font = Enum.Font.GothamBold
-        CloseButton.Parent = MainFrame
-        
-        local CloseCorner = Instance.new("UICorner")
-        CloseCorner.CornerRadius = UDim.new(0, 6)
-        CloseCorner.Parent = CloseButton
-        
-        -- Config variables to display
-        local configVariables = {
-            "REMOVE_CLOTHING = " .. tostring(Config.REMOVE_CLOTHING),
-            "REMOVE_MESH = " .. tostring(Config.REMOVE_MESH),
-            "REDUCE_NETWORK_TRAFFIC = " .. tostring(Config.REDUCE_NETWORK_TRAFFIC),
-            "REMOVE_SOUNDS = " .. tostring(Config.REMOVE_SOUNDS),
-            "REMOVE_CHAT_BUBBLES = " .. tostring(Config.REMOVE_CHAT_BUBBLES),
-            "REMOVE_EFFECTS = " .. tostring(Config.REMOVE_EFFECTS),
-            "REMOVE_ANIMATIONS = " .. tostring(Config.REMOVE_ANIMATIONS),
-            "THROTTLE_PARTICLES = " .. tostring(Config.THROTTLE_PARTICLES),
-            "THROTTLE_TEXTURES = " .. tostring(Config.THROTTLE_TEXTURES),
-            "LOW_POLY_CONVERSION = " .. tostring(Config.LOW_POLY_CONVERSION),
-            "OPTIMIZE_PHYSICS = " .. tostring(Config.OPTIMIZE_PHYSICS),
-            "DISABLE_CONSTRAINTS = " .. tostring(Config.DISABLE_CONSTRAINTS),
-        }
-        
-        -- Create config items
-        for i, configText in ipairs(configVariables) do
-            local ConfigItem = Instance.new("Frame")
-            local ConfigLabel = Instance.new("TextLabel")
-            local CopyButton = Instance.new("TextButton")
-            
-            ConfigItem.Name = "ConfigItem"
-            ConfigItem.Size = UDim2.new(1, 0, 0, 30)
-            ConfigItem.BackgroundTransparency = 1
-            ConfigItem.Parent = ScrollFrame
-            
-            ConfigLabel.Name = "ConfigLabel"
-            ConfigLabel.Size = UDim2.new(0.7, 0, 1, 0)
-            ConfigLabel.Position = UDim2.new(0, 0, 0, 0)
-            ConfigLabel.BackgroundTransparency = 1
-            ConfigLabel.Text = configText
-            ConfigLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
-            ConfigLabel.TextSize = 12
-            ConfigLabel.TextXAlignment = Enum.TextXAlignment.Left
-            ConfigLabel.Font = Enum.Font.Gotham
-            ConfigLabel.Parent = ConfigItem
-            
-            CopyButton.Name = "CopyButton"
-            CopyButton.Size = UDim2.new(0.25, 0, 0.7, 0)
-            CopyButton.Position = UDim2.new(0.72, 0, 0.15, 0)
-            CopyButton.BackgroundColor3 = Color3.fromRGB(80, 80, 120)
-            CopyButton.BorderSizePixel = 0
-            CopyButton.Text = "Copy"
-            CopyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-            CopyButton.TextSize = 11
-            CopyButton.Font = Enum.Font.Gotham
-            CopyButton.Parent = ConfigItem
-            
-            local ButtonCorner = Instance.new("UICorner")
-            ButtonCorner.CornerRadius = UDim.new(0, 4)
-            ButtonCorner.Parent = CopyButton
-            
-            -- Copy individual config
-            CopyButton.MouseButton1Click:Connect(function()
-                setclipboard(configText)
-                CopyButton.Text = "✓ Copied!"
-                task.wait(1)
-                CopyButton.Text = "Copy"
-            end)
-        end
-        
-        -- Update canvas size
-        local totalHeight = #configVariables * 35
-        ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
-        
-        -- Copy all configs
-        CopyAllButton.MouseButton1Click:Connect(function()
-            local allConfigs = table.concat(configVariables, ",\n")
-            setclipboard(allConfigs)
-            CopyAllButton.Text = "✓ All Configs Copied!"
-            task.wait(1.5)
-            CopyAllButton.Text = "📋 Copy All Config Variables"
-        end)
-        
-        -- Close button
-        CloseButton.MouseButton1Click:Connect(function()
-            local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-            local tween = TweenService:Create(MainFrame, tweenInfo, {Size = UDim2.new(0, 0, 0, 0)})
-            tween:Play()
-            tween.Completed:Connect(function()
-                ScreenGui:Destroy()
-            end)
-        end)
-        
-        -- Make draggable
-        local dragging = false
-        local dragInput, dragStart, startPos
-        
-        Title.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = true
-                dragStart = input.Position
-                startPos = MainFrame.Position
-                
-                input.Changed:Connect(function()
-                    if input.UserInputState == Enum.UserInputState.End then
-                        dragging = false
-                    end
-                end)
-            end
-        end)
-        
-        Title.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseMovement then
-                dragInput = input
-            end
-        end)
-        
-        game:GetService("UserInputService").InputChanged:Connect(function(input)
-            if input == dragInput and dragging then
-                local delta = input.Position - dragStart
-                MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-            end
-        end)
-        
-        -- Auto-close after 30 seconds
-        task.delay(30, function()
-            if ScreenGui and ScreenGui.Parent then
-                ScreenGui:Destroy()
-            end
-        end)
-        
-        return ScreenGui
+    local function UpdateLog()
+    	if not Config.SHOW_UPDATELOG then return end
+    	--// Services
+    	local Players = game:GetService("Players")
+    	local LocalPlayer = Players.LocalPlayer
+    	local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+    	--// UI Setup
+    	local ScreenGui = Instance.new("ScreenGui")
+    	ScreenGui.Name = "UpdateLogUI"
+    	ScreenGui.ResetOnSpawn = false
+    	ScreenGui.Parent = PlayerGui
+    	local MainFrame = Instance.new("Frame")
+    	MainFrame.Name = "MainFrame"
+    	MainFrame.Size = UDim2.new(0, 350, 0, 250)
+    	MainFrame.Position = UDim2.new(0.5, -175, 0.5, -125)
+    	MainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    	MainFrame.BackgroundTransparency = 0.15
+    	MainFrame.BorderSizePixel = 0
+    	MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    	MainFrame.Active = true
+    	MainFrame.Draggable = true
+    	MainFrame.Parent = ScreenGui
+    	local UICorner = Instance.new("UICorner", MainFrame)
+    	UICorner.CornerRadius = UDim.new(0, 10)
+    	--// Title
+    	local Title = Instance.new("TextLabel")
+    	Title.Size = UDim2.new(1, -60, 0, 30)
+    	Title.Position = UDim2.new(0, 10, 0, 5)
+    	Title.BackgroundTransparency = 1
+    	Title.Text = "📜 Update Log"
+    	Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    	Title.TextScaled = true
+    	Title.Font = Enum.Font.GothamBold
+    	Title.TextXAlignment = Enum.TextXAlignment.Left
+    	Title.Parent = MainFrame
+    	--// Close Button
+    	local CloseBtn = Instance.new("TextButton")
+    	CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+    	CloseBtn.Position = UDim2.new(1, -35, 0, 5)
+    	CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    	CloseBtn.Text = "✖"
+    	CloseBtn.TextColor3 = Color3.new(1, 1, 1)
+    	CloseBtn.TextScaled = true
+    	CloseBtn.Font = Enum.Font.GothamBold
+    	CloseBtn.Parent = MainFrame
+    	local CloseCorner = Instance.new("UICorner", CloseBtn)
+    	CloseCorner.CornerRadius = UDim.new(1, 0)
+    	--// Scrolling Update Log Text
+    	local ScrollFrame = Instance.new("ScrollingFrame")
+    	ScrollFrame.Size = UDim2.new(1, -20, 1, -80)
+    	ScrollFrame.Position = UDim2.new(0, 10, 0, 45)
+    	ScrollFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    	ScrollFrame.BorderSizePixel = 0
+    	ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    	ScrollFrame.ScrollBarThickness = 6
+    	ScrollFrame.Parent = MainFrame
+    	local ScrollCorner = Instance.new("UICorner", ScrollFrame)
+    	ScrollCorner.CornerRadius = UDim.new(0, 6)
+    	local TextLabel = Instance.new("TextLabel")
+    	TextLabel.Size = UDim2.new(1, -10, 0, 300)
+    	TextLabel.Position = UDim2.new(0, 5, 0, 5)
+    	TextLabel.BackgroundTransparency = 1
+    	TextLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+    	TextLabel.TextWrapped = true
+    	TextLabel.TextXAlignment = Enum.TextXAlignment.Left
+    	TextLabel.TextYAlignment = Enum.TextYAlignment.Top
+    	TextLabel.Font = Enum.Font.Gotham
+    	TextLabel.TextSize = 16
+    	TextLabel.Text = [[
+    SHOW_UPDATELOG = true,
+       
+    -- Old variables
+    ENABLED = true,
+    OPTIMIZATION_INTERVAL = 30,
+    SHOW_UPDATELOG = true
+    MIN_INTERVAL = 3,
+    MAX_DISTANCE = 50,
+    PERFORMANCE_MONITORING = true,
+    FPS_THRESHOLD = 30,
+    GRAY_SKY_ENABLED = true,
+    GRAY_SKY_ID = "rbxassetid://114666145996289",
+    FULL_BRIGHT_ENABLED = true,
+    SMOOTH_PLASTIC_ENABLED = true,
+    COLLISION_GROUP_NAME = "OptimizedParts",
+    OPTIMIZE_PHYSICS = true,
+    DISABLE_CONSTRAINTS = true,
+    THROTTLE_PARTICLES = true,
+    THROTTLE_TEXTURES = true,
+    REMOVE_ANIMATIONS = true,
+    LOW_POLY_CONVERSION = true,
+    SELECTIVE_TEXTURE_REMOVAL = true,
+    PRESERVE_IMPORTANT_TEXTURES = true,
+    IMPORTANT_TEXTURE_KEYWORDS = {"sign", "ui", "hud", "menu", "button", "fence"},
+    QUALITY_LEVEL = 1,
+    FPS_CAP = 1000,
+    MEMORY_CLEANUP_THRESHOLD = 500,
+    ]]
+    	TextLabel.Parent = ScrollFrame
+    	ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, TextLabel.TextBounds.Y + 10)
+    	--// Copy Text Button
+    	local CopyBtn = Instance.new("TextButton")
+    	CopyBtn.Size = UDim2.new(0, 150, 0, 35)
+    	CopyBtn.Position = UDim2.new(0.5, -75, 1, -40)
+    	CopyBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 255)
+    	CopyBtn.Text = "Copy Variable"
+    	CopyBtn.TextColor3 = Color3.new(1, 1, 1)
+    	CopyBtn.TextScaled = true
+    	CopyBtn.Font = Enum.Font.GothamBold
+    	CopyBtn.Parent = MainFrame
+    	local CopyCorner = Instance.new("UICorner", CopyBtn)
+    	CopyCorner.CornerRadius = UDim.new(0, 8)
+    	--// Copy Function
+    	local function CopyToClipboard(text)
+    		setclipboard = setclipboard or toclipboard
+    		if setclipboard then
+    			setclipboard(text)
+    		else
+    			warn("Clipboard function not supported.")
+    		end
+    	end
+    	CopyBtn.MouseButton1Click:Connect(function()
+    		CopyToClipboard(TextLabel.Text)
+    		CopyBtn.Text = "Copied!"
+    		task.wait(1.5)
+    		CopyBtn.Text = "Copy Variable"
+    	end)
+    	--// Close Button Behavior
+    	CloseBtn.MouseButton1Click:Connect(function()
+    		ScreenGui:Destroy()
+    	end)
     end
-
+    UpdateLogs()
     local function RemoveMesh(target)
-        if not Config.REMOVE_MESH then return end  -- Early return if disabled
-        
         local textureKeywords = {
             "chair", "seat", "stool", "bench", "coffee", "fruit", "paper", "document", 
             "note", "cup", "mug", "photo", "monitor", "screen", "display", "pistol", 
@@ -409,10 +311,7 @@ local function Main(ExternalConfig)
             end
         end
     end
-    -- Only call RemoveMesh if it's enabled in config
-    if Config.REMOVE_MESH then
-        RemoveMesh()
-    end
+    RemoveMesh()
     local function fpsc()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/hm5650/Fps-counter/refs/heads/main/Fpsc", true))()
     end
@@ -948,6 +847,7 @@ local function Main(ExternalConfig)
                 end
             end
         end
+        print("Accessories removed from other players' characters.")
     end
     Players.PlayerAdded:Connect(function(player)
         if player ~= localPlayer then
@@ -958,33 +858,6 @@ local function Main(ExternalConfig)
         end
     end)
     removeOtherPlayerAccessories()
-    local function removeClothing()
-        if not Config.REMOVE_CLOTHING then return end
-        
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                for _, item in ipairs(player.Character:GetDescendants()) do
-                    if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") then
-                        pcall(function() item:Destroy() end)
-                    end
-                end
-            end
-        end
-    end
-    local function reduceNetworkTraffic()
-        if not Config.REDUCE_NETWORK_TRAFFIC then return end
-        
-        -- Reduce network ownership updates
-        settings().Network.IncomingReplicationLag = 1000
-        
-        for _, part in ipairs(workspace:GetDescendants()) do
-            if part:IsA("BasePart") and part:CanSetNetworkOwnership() then
-                pcall(function()
-                    part:SetNetworkOwnershipAuto()
-                end)
-            end
-        end
-    end
     local function applya()
         if not Config.ENABLED then return end
         
