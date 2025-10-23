@@ -25,6 +25,14 @@ local Config = {
     QUALITY_LEVEL = 1,
     FPS_CAP = 1000,
     MEMORY_CLEANUP_THRESHOLD = 500,
+    NETWORK_OPTIMIZATION = true,
+    REDUCE_REPLICATION = true,
+    THROTTLE_REMOTE_EVENTS = false,
+    OPTIMIZE_CHAT = true,
+    DISABLE_UNNECESSARY_GUI = true,
+    STREAMING_ENABLED = true,
+    REDUCE_PLAYER_REPLICATION_DISTANCE = 100,
+    THROTTLE_SOUNDS = true,
 }
 
 local function Main(ExternalConfig)
@@ -80,11 +88,9 @@ local function Main(ExternalConfig)
     setSmoothPlastic()
     local function UpdateLog()
     	if not Config.SHOW_UPDATELOG then return end
-    	--// Services
     	local Players = game:GetService("Players")
     	local LocalPlayer = Players.LocalPlayer
     	local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-    	--// UI Setup
     	local ScreenGui = Instance.new("ScreenGui")
     	ScreenGui.Name = "UpdateLogUI"
     	ScreenGui.ResetOnSpawn = false
@@ -102,18 +108,16 @@ local function Main(ExternalConfig)
     	MainFrame.Parent = ScreenGui
     	local UICorner = Instance.new("UICorner", MainFrame)
     	UICorner.CornerRadius = UDim.new(0, 10)
-    	--// Title
     	local Title = Instance.new("TextLabel")
     	Title.Size = UDim2.new(1, -60, 0, 30)
     	Title.Position = UDim2.new(0, 10, 0, 5)
     	Title.BackgroundTransparency = 1
-    	Title.Text = "📜 Update Log"
+    	Title.Text = "📜 New Variables"
     	Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     	Title.TextScaled = true
     	Title.Font = Enum.Font.GothamBold
     	Title.TextXAlignment = Enum.TextXAlignment.Left
     	Title.Parent = MainFrame
-    	--// Close Button
     	local CloseBtn = Instance.new("TextButton")
     	CloseBtn.Size = UDim2.new(0, 30, 0, 30)
     	CloseBtn.Position = UDim2.new(1, -35, 0, 5)
@@ -125,7 +129,6 @@ local function Main(ExternalConfig)
     	CloseBtn.Parent = MainFrame
     	local CloseCorner = Instance.new("UICorner", CloseBtn)
     	CloseCorner.CornerRadius = UDim.new(1, 0)
-    	--// Scrolling Update Log Text
     	local ScrollFrame = Instance.new("ScrollingFrame")
     	ScrollFrame.Size = UDim2.new(1, -20, 1, -80)
     	ScrollFrame.Position = UDim2.new(0, 10, 0, 45)
@@ -147,9 +150,18 @@ local function Main(ExternalConfig)
     	TextLabel.Font = Enum.Font.Gotham
     	TextLabel.TextSize = 16
     	TextLabel.Text = [[
+    -- New Variables
     SHOW_UPDATELOG = true,
+    NETWORK_OPTIMIZATION = true,
+    REDUCE_REPLICATION = true,
+    THROTTLE_REMOTE_EVENTS = false, -- risky
+    OPTIMIZE_CHAT = true,
+    DISABLE_UNNECESSARY_GUI = true,
+    STREAMING_ENABLED = true,
+    REDUCE_PLAYER_REPLICATION_DISTANCE = 100,
+    THROTTLE_SOUNDS = true,
     
-    -- Old Variable
+    -- Previous Variables
     ENABLED = true,
     OPTIMIZATION_INTERVAL = 30,
     MIN_INTERVAL = 3,
@@ -827,34 +839,181 @@ local function Main(ExternalConfig)
             end
         end
     end
-    local function removeOtherPlayerAccessories()
-        if not localPlayer then
-            warn("LocalPlayer not available yet.")
-            return
+    local function optimizeNetworkSettings()
+        if not Config.NETWORK_OPTIMIZATION then return end
+        
+        settings().Network.StreamingEnabled = Config.STREAMING_ENABLED
+        
+        if settings().Physics then
+            settings().Physics.PhysicsSendRate = 30
+            settings().Physics.PhysicsSendRate = 60
         end
+        
         for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= localPlayer then
-                local character = player.Character
-                if character then
-                    for _, descendant in ipairs(character:GetChildren()) do
-                        if descendant:IsA("Accessory") then
-                            descendant:Destroy()
-                        end
+            if player ~= LocalPlayer and player.Character then
+                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    pcall(function()
+                        humanoid.AutoJumpEnabled = false
+                    end)
+                end
+            end
+        end
+    end
+    local function reduceReplication()
+        if not Config.REDUCE_REPLICATION then return end
+        
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") then
+                if obj.Anchored and not obj:IsDescendantOf(LocalPlayer.Character) then
+                    pcall(function()
+                        obj:SetNetworkOwner(nil)
+                    end)
+                end
+                
+                local distance = 0
+                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    distance = (obj.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                end
+                
+                if distance > Config.REDUCE_PLAYER_REPLICATION_DISTANCE then
+                    pcall(function()
+                        obj:SetNetworkOwnershipAuto()
+                    end)
+                end
+            end
+        end
+    end
+    local function throttleRemoteEvents()
+        if not Config.THROTTLE_REMOTE_EVENTS then return end
+        
+        local remoteThrottle = {}
+        local maxCallsPerSecond = 10
+        
+        local function throttleRemote(remote, ...)
+            local currentTime = tick()
+            local remoteId = tostring(remote)
+            
+            if not remoteThrottle[remoteId] then
+                remoteThrottle[remoteId] = {}
+            end
+            
+            for i = #remoteThrottle[remoteId], 1, -1 do
+                if currentTime - remoteThrottle[remoteId][i] > 1 then
+                    table.remove(remoteThrottle[remoteId], i)
+                end
+            end
+            
+            if #remoteThrottle[remoteId] < maxCallsPerSecond then
+                table.insert(remoteThrottle[remoteId], currentTime)
+                return true
+            end
+            
+            return false
+        end
+        
+        for _, obj in ipairs(game:GetDescendants()) do
+            if obj:IsA("RemoteEvent") then
+                local oldFireServer = obj.FireServer
+                obj.FireServer = function(self, ...)
+                    if throttleRemote(self, ...) then
+                        return oldFireServer(self, ...)
+                    end
+                end
+            elseif obj:IsA("RemoteFunction") then
+                local oldInvokeServer = obj.InvokeServer
+                obj.InvokeServer = function(self, ...)
+                    if throttleRemote(self, ...) then
+                        return oldInvokeServer(self, ...)
                     end
                 end
             end
         end
-        print("Accessories removed from other players' characters.")
     end
-    Players.PlayerAdded:Connect(function(player)
-        if player ~= localPlayer then
-            player.CharacterAdded:Connect(function()
-                task.wait(0.5) 
-                removeOtherPlayerAccessories()
+    local function optimizeChat()
+        if not Config.OPTIMIZE_CHAT then return end
+        
+        local TextChatService = game:GetService("TextChatService")
+        local Players = game:GetService("Players")
+        
+        pcall(function()
+            if TextChatService then
+                local channel = TextChatService:FindFirstChild("TextChannels"):FindFirstChild("RBXGeneral")
+                if channel then
+                    channel.MaximumChannelHistory = 50
+                end
+            end
+        end)
+        
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                pcall(function()
+                    if player:GetAttribute("BubbleChatEnabled") ~= nil then
+                        player:SetAttribute("BubbleChatEnabled", false)
+                    end
+                end)
+            end
+        end
+    end
+    local function disableUnnecessaryGUI()
+        if not Config.DISABLE_UNNECESSARY_GUI then return end
+        
+        local CoreGui = game:GetService("CoreGui")
+        local GuiService = game:GetService("GuiService")
+        
+        local elementsToDisable = {
+            "PlayerList", 
+            "EmotesMenu", 
+            "Health",
+            "BubbleChat"
+        }
+        
+        for _, element in ipairs(elementsToDisable) do
+            pcall(function()
+                local guiElement = CoreGui:FindFirstChild(element)
+                if guiElement then
+                    guiElement.Enabled = false
+                end
             end)
         end
-    end)
-    removeOtherPlayerAccessories()
+        
+        GuiService:SetGlobalGuiInset(0, 0, 0, 0)
+    end
+    local function throttleSounds()
+        if not Config.THROTTLE_SOUNDS then return end
+        
+        for _, sound in ipairs(workspace:GetDescendants()) do
+            if sound:IsA("Sound") then
+                local distance = 0
+                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    distance = (sound.Parent and sound.Parent:IsA("BasePart") and 
+                               (sound.Parent.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude) or 0
+                end
+                
+                if distance > Config.MAX_DISTANCE then
+                    sound:Stop()
+                    sound.Playing = false
+                elseif distance > Config.MAX_DISTANCE / 2 then
+                    sound.Volume = sound.Volume * 0.3
+                end
+            end
+        end
+    end
+    local function optimizeDataModel()
+        local HttpService = game:GetService("HttpService")
+        local Stats = game:GetService("Stats")
+        
+        pcall(function()
+            HttpService.HttpEnabled = false
+        end)
+        
+        pcall(function()
+            if Stats then
+                Stats.PerformanceStats.MeshCacheSize = 10
+                Stats.PerformanceStats.TextureCacheSize = 10
+            end
+        end)
+    end
     local function applya()
         if not Config.ENABLED then return end
         
@@ -879,7 +1038,16 @@ local function Main(ExternalConfig)
         binmem()
         selectiveTextureRemoval()
         monitorPerformance()
-        RemoveMesh()
+        if Config.REMOVE_MESH then
+            RemoveMesh()
+        end
+        optimizeNetworkSettings()
+        reduceReplication()
+        throttleRemoteEvents()
+        optimizeChat()
+        disableUnnecessaryGUI()
+        throttleSounds()
+        optimizeDataModel()
     end
     applya()
     Players.PlayerAdded:Connect(function(player)
