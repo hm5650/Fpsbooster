@@ -118,7 +118,7 @@ local function Main(ExternalConfig)
     	CloseBtn.Size = UDim2.new(0, 30, 0, 30)
     	CloseBtn.Position = UDim2.new(1, -35, 0, 5)
     	CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    	CloseBtn.Text = "✖"
+    	CloseBtn.Text = "x"
     	CloseBtn.TextColor3 = Color3.new(1, 1, 1)
     	CloseBtn.TextScaled = true
     	CloseBtn.Font = Enum.Font.GothamBold
@@ -148,20 +148,17 @@ local function Main(ExternalConfig)
     	TextLabel.TextSize = 16
     	TextLabel.Text = [[
     SHOW_UPDATELOG = true,
-       
-    -- Old variables
+    
+    -- Old Variable
     ENABLED = true,
     OPTIMIZATION_INTERVAL = 30,
-    SHOW_UPDATELOG = true
     MIN_INTERVAL = 3,
     MAX_DISTANCE = 50,
     PERFORMANCE_MONITORING = true,
     FPS_THRESHOLD = 30,
     GRAY_SKY_ENABLED = true,
-    GRAY_SKY_ID = "rbxassetid://114666145996289",
     FULL_BRIGHT_ENABLED = true,
     SMOOTH_PLASTIC_ENABLED = true,
-    COLLISION_GROUP_NAME = "OptimizedParts",
     OPTIMIZE_PHYSICS = true,
     DISABLE_CONSTRAINTS = true,
     THROTTLE_PARTICLES = true,
