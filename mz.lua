@@ -7,6 +7,7 @@ local Config = {
     MIN_INTERVAL = 3,
     MAX_DISTANCE = 50,
     PERFORMANCE_MONITORING = true,
+    FPS_MONITOR = true,
     FPS_THRESHOLD = 30,
     GRAY_SKY_ENABLED = true,
     GRAY_SKY_ID = "rbxassetid://114666145996289",
@@ -27,12 +28,14 @@ local Config = {
     MEMORY_CLEANUP_THRESHOLD = 500,
     NETWORK_OPTIMIZATION = true,
     REDUCE_REPLICATION = true,
-    THROTTLE_REMOTE_EVENTS = false,
+    THROTTLE_REMOTE_EVENTS = true,
     OPTIMIZE_CHAT = true,
     DISABLE_UNNECESSARY_GUI = true,
     STREAMING_ENABLED = true,
     REDUCE_PLAYER_REPLICATION_DISTANCE = 100,
     THROTTLE_SOUNDS = true,
+    REMOVE_GRASS = true,
+    DESTROY_PARTICLES = true,
 }
 
 local function Main(ExternalConfig)
@@ -86,139 +89,274 @@ local function Main(ExternalConfig)
         Workspace.DescendantAdded:Connect(handleInstance)
     end
     setSmoothPlastic()
-    local function UpdateLog()
-    	if not Config.SHOW_UPDATELOG then return end
-    	local Players = game:GetService("Players")
-    	local LocalPlayer = Players.LocalPlayer
-    	local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-    	local ScreenGui = Instance.new("ScreenGui")
-    	ScreenGui.Name = "UpdateLogUI"
-    	ScreenGui.ResetOnSpawn = false
-    	ScreenGui.Parent = PlayerGui
-    	local MainFrame = Instance.new("Frame")
-    	MainFrame.Name = "MainFrame"
-    	MainFrame.Size = UDim2.new(0, 350, 0, 250)
-    	MainFrame.Position = UDim2.new(0.5, -175, 0.5, -125)
-    	MainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    	MainFrame.BackgroundTransparency = 0.15
-    	MainFrame.BorderSizePixel = 0
-    	MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    	MainFrame.Active = true
-    	MainFrame.Draggable = true
-    	MainFrame.Parent = ScreenGui
-    	local UICorner = Instance.new("UICorner", MainFrame)
-    	UICorner.CornerRadius = UDim.new(0, 10)
-    	local Title = Instance.new("TextLabel")
-    	Title.Size = UDim2.new(1, -60, 0, 30)
-    	Title.Position = UDim2.new(0, 10, 0, 5)
-    	Title.BackgroundTransparency = 1
-    	Title.Text = "📜 New Variables"
-    	Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    	Title.TextScaled = true
-    	Title.Font = Enum.Font.GothamBold
-    	Title.TextXAlignment = Enum.TextXAlignment.Left
-    	Title.Parent = MainFrame
-    	local CloseBtn = Instance.new("TextButton")
-    	CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-    	CloseBtn.Position = UDim2.new(1, -35, 0, 5)
-    	CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    	CloseBtn.Text = "x"
-    	CloseBtn.TextColor3 = Color3.new(1, 1, 1)
-    	CloseBtn.TextScaled = true
-    	CloseBtn.Font = Enum.Font.GothamBold
-    	CloseBtn.Parent = MainFrame
-    	local CloseCorner = Instance.new("UICorner", CloseBtn)
-    	CloseCorner.CornerRadius = UDim.new(1, 0)
-    	local ScrollFrame = Instance.new("ScrollingFrame")
-    	ScrollFrame.Size = UDim2.new(1, -20, 1, -80)
-    	ScrollFrame.Position = UDim2.new(0, 10, 0, 45)
-    	ScrollFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    	ScrollFrame.BorderSizePixel = 0
-    	ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    	ScrollFrame.ScrollBarThickness = 6
-    	ScrollFrame.Parent = MainFrame
-    	local ScrollCorner = Instance.new("UICorner", ScrollFrame)
-    	ScrollCorner.CornerRadius = UDim.new(0, 6)
-    	local TextLabel = Instance.new("TextLabel")
-    	TextLabel.Size = UDim2.new(1, -10, 0, 300)
-    	TextLabel.Position = UDim2.new(0, 5, 0, 5)
-    	TextLabel.BackgroundTransparency = 1
-    	TextLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
-    	TextLabel.TextWrapped = true
-    	TextLabel.TextXAlignment = Enum.TextXAlignment.Left
-    	TextLabel.TextYAlignment = Enum.TextYAlignment.Top
-    	TextLabel.Font = Enum.Font.Gotham
-    	TextLabel.TextSize = 16
-    	TextLabel.Text = [[
-    -- New Variables
-    SHOW_UPDATELOG = true,
-    NETWORK_OPTIMIZATION = true,
-    REDUCE_REPLICATION = true,
-    THROTTLE_REMOTE_EVENTS = false, -- risky
-    OPTIMIZE_CHAT = true,
-    DISABLE_UNNECESSARY_GUI = true,
-    STREAMING_ENABLED = true,
-    REDUCE_PLAYER_REPLICATION_DISTANCE = 100,
-    THROTTLE_SOUNDS = true,
-    
-    -- Previous Variables
-    ENABLED = true,
-    OPTIMIZATION_INTERVAL = 30,
-    MIN_INTERVAL = 3,
-    MAX_DISTANCE = 50,
-    PERFORMANCE_MONITORING = true,
-    FPS_THRESHOLD = 30,
-    GRAY_SKY_ENABLED = true,
-    FULL_BRIGHT_ENABLED = true,
-    SMOOTH_PLASTIC_ENABLED = true,
-    OPTIMIZE_PHYSICS = true,
-    DISABLE_CONSTRAINTS = true,
-    THROTTLE_PARTICLES = true,
-    THROTTLE_TEXTURES = true,
-    REMOVE_ANIMATIONS = true,
-    LOW_POLY_CONVERSION = true,
-    SELECTIVE_TEXTURE_REMOVAL = true,
-    PRESERVE_IMPORTANT_TEXTURES = true,
-    IMPORTANT_TEXTURE_KEYWORDS = {"sign", "ui", "hud", "menu", "button", "fence"},
-    QUALITY_LEVEL = 1,
-    FPS_CAP = 1000,
-    MEMORY_CLEANUP_THRESHOLD = 500,
+    local function CreateUpdateLog()
+        if not Config.SHOW_UPDATELOG then return end
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "UpdateLog"
+        screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+        local UserInputService = game:GetService("UserInputService")
+        local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
+        
+        local frameWidth = isMobile and 300 or 400
+        local frameHeight = isMobile and 350 or 450
+        local textSize = isMobile and 10 or 12
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, frameWidth, 0, frameHeight)
+        frame.Position = UDim2.new(0.5, -frameWidth/2, 0.5, -frameHeight/2)
+        frame.BackgroundColor3 = Color3.new(0.05, 0.05, 0.05)
+        frame.BorderColor3 = Color3.new(0.3, 0.3, 0.3)
+        frame.BorderSizePixel = 2
+        frame.Parent = screenGui
+        local dragHeader = Instance.new("Frame")
+        dragHeader.Size = UDim2.new(1, 0, 0, isMobile and 30 or 25)
+        dragHeader.Position = UDim2.new(0, 0, 0, 0)
+        dragHeader.BackgroundColor3 = Color3.new(0.15, 0.15, 0.15)
+        dragHeader.BorderColor3 = Color3.new(0.4, 0.4, 0.4)
+        dragHeader.BorderSizePixel = 1
+        dragHeader.Parent = frame
+        local headerTitle = Instance.new("TextLabel")
+        headerTitle.Size = UDim2.new(1, -80, 1, 0)
+        headerTitle.Position = UDim2.new(0, 5, 0, 0)
+        headerTitle.BackgroundTransparency = 1
+        headerTitle.Text = "// UPDATE_LOG v1.0"
+        headerTitle.TextColor3 = Color3.new(0, 1, 0)
+        headerTitle.TextSize = textSize
+        headerTitle.Font = Enum.Font.Code
+        headerTitle.TextXAlignment = Enum.TextXAlignment.Left
+        headerTitle.Parent = dragHeader
+        local closeButton = Instance.new("TextButton")
+        closeButton.Size = UDim2.new(0, isMobile and 35 or 25, 0, isMobile and 30 or 25)
+        closeButton.Position = UDim2.new(1, -(isMobile and 35 or 25), 0, 0)
+        closeButton.BackgroundColor3 = Color3.new(0.3, 0.1, 0.1)
+        closeButton.BorderColor3 = Color3.new(0.6, 0.2, 0.2)
+        closeButton.Text = "X"
+        closeButton.TextColor3 = Color3.new(1, 0.3, 0.3)
+        closeButton.TextSize = textSize
+        closeButton.Font = Enum.Font.Code
+        closeButton.Parent = dragHeader
+        local copyButton = Instance.new("TextButton")
+        copyButton.Size = UDim2.new(0, isMobile and 35 or 50, 0, isMobile and 30 or 25)
+        copyButton.Position = UDim2.new(1, -(isMobile and 70 or 75), 0, 0)
+        copyButton.BackgroundColor3 = Color3.new(0.1, 0.1, 0.3)
+        copyButton.BorderColor3 = Color3.new(0.2, 0.2, 0.6)
+        copyButton.Text = "Copy"
+        copyButton.TextColor3 = Color3.new(0.3, 0.3, 1)
+        copyButton.TextSize = textSize
+        copyButton.Font = Enum.Font.Code
+        copyButton.Parent = dragHeader
+        local scrollFrame = Instance.new("ScrollingFrame")
+        scrollFrame.Size = UDim2.new(1, -10, 1, -(isMobile and 40 or 35))
+        scrollFrame.Position = UDim2.new(0, 5, 0, isMobile and 35 or 30)
+        scrollFrame.BackgroundColor3 = Color3.new(0.08, 0.08, 0.08)
+        scrollFrame.BorderSizePixel = 0
+        scrollFrame.ScrollBarThickness = isMobile and 12 or 8
+        scrollFrame.ScrollBarImageColor3 = Color3.new(0.2, 0.2, 0.2)
+        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+        scrollFrame.VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
+        scrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+        scrollFrame.ElasticBehavior = Enum.ElasticBehavior.Never
+        scrollFrame.Parent = frame
+        local uiListLayout = Instance.new("UIListLayout")
+        uiListLayout.Padding = UDim.new(0, 5)
+        uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        uiListLayout.Parent = scrollFrame
+        local contentLabel = Instance.new("TextLabel")
+        contentLabel.Size = UDim2.new(1, -10, 0, 0)
+        contentLabel.BackgroundTransparency = 1
+        contentLabel.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+        contentLabel.TextSize = textSize
+        contentLabel.Font = Enum.Font.Code
+        contentLabel.TextXAlignment = Enum.TextXAlignment.Left
+        contentLabel.TextYAlignment = Enum.TextYAlignment.Top
+        contentLabel.TextWrapped = true
+        contentLabel.AutomaticSize = Enum.AutomaticSize.Y
+        contentLabel.LayoutOrder = 1
+        contentLabel.Parent = scrollFrame
+        local configText = [[
+    -- like the new design ;)
+    local OptizConfig = {
+        ENABLED = true,
+        OPTIMIZATION_INTERVAL = 30,
+        SHOW_UPDATELOG = true,
+        MIN_INTERVAL = 3,
+        MAX_DISTANCE = 50,
+        PERFORMANCE_MONITORING = true,
+        FPS_MONITOR = true,
+        FPS_THRESHOLD = 30,
+        GRAY_SKY_ENABLED = true,
+        FULL_BRIGHT_ENABLED = true,
+        SMOOTH_PLASTIC_ENABLED = true,
+        OPTIMIZE_PHYSICS = true,
+        DISABLE_CONSTRAINTS = true,
+        THROTTLE_PARTICLES = true,
+        THROTTLE_TEXTURES = true,
+        REMOVE_ANIMATIONS = true,
+        LOW_POLY_CONVERSION = true,
+        SELECTIVE_TEXTURE_REMOVAL = true,
+        PRESERVE_IMPORTANT_TEXTURES = true,
+        IMPORTANT_TEXTURE_KEYWORDS = {"sign", "ui", "hud", "menu", "button", "fence"},
+        QUALITY_LEVEL = 1,
+        FPS_CAP = 1000,
+        MEMORY_CLEANUP_THRESHOLD = 500,
+        NETWORK_OPTIMIZATION = true,
+        REDUCE_REPLICATION = true,
+        THROTTLE_REMOTE_EVENTS = false,
+        OPTIMIZE_CHAT = true,
+        DISABLE_UNNECESSARY_GUI = true,
+        STREAMING_ENABLED = true,
+        REDUCE_PLAYER_REPLICATION_DISTANCE = 100,
+        THROTTLE_SOUNDS = true,
+        REMOVE_GRASS = true,
+        DESTROY_PARTICLES = true,
+    }
     ]]
-    	TextLabel.Parent = ScrollFrame
-    	ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, TextLabel.TextBounds.Y + 10)
-    	--// Copy Text Button
-    	local CopyBtn = Instance.new("TextButton")
-    	CopyBtn.Size = UDim2.new(0, 150, 0, 35)
-    	CopyBtn.Position = UDim2.new(0.5, -75, 1, -40)
-    	CopyBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 255)
-    	CopyBtn.Text = "Copy Variable"
-    	CopyBtn.TextColor3 = Color3.new(1, 1, 1)
-    	CopyBtn.TextScaled = true
-    	CopyBtn.Font = Enum.Font.GothamBold
-    	CopyBtn.Parent = MainFrame
-    	local CopyCorner = Instance.new("UICorner", CopyBtn)
-    	CopyCorner.CornerRadius = UDim.new(0, 8)
-    	--// Copy Function
-    	local function CopyToClipboard(text)
-    		setclipboard = setclipboard or toclipboard
-    		if setclipboard then
-    			setclipboard(text)
-    		else
-    			warn("Clipboard function not supported.")
-    		end
-    	end
-    	CopyBtn.MouseButton1Click:Connect(function()
-    		CopyToClipboard(TextLabel.Text)
-    		CopyBtn.Text = "Copied!"
-    		task.wait(1.5)
-    		CopyBtn.Text = "Copy Variable"
-    	end)
-    	--// Close Button Behavior
-    	CloseBtn.MouseButton1Click:Connect(function()
-    		ScreenGui:Destroy()
-    	end)
+        contentLabel.Text = configText
+        local function updateCanvasSize()
+            local contentSize = uiListLayout.AbsoluteContentSize
+            scrollFrame.CanvasSize = UDim2.new(0, 0, 0, contentSize.Y + 10)
+        end
+        uiListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvasSize)
+        contentLabel:GetPropertyChangedSignal("TextBounds"):Connect(updateCanvasSize)
+        task.spawn(function()
+            wait(0.1)
+            updateCanvasSize()
+        end)
+        copyButton.MouseButton1Click:Connect(function()
+            setclipboard(configText)
+            
+            local originalText = copyButton.Text
+            local originalBgColor = copyButton.BackgroundColor3
+            local originalTextColor = copyButton.TextColor3
+            
+            copyButton.Text = "Copied!"
+            copyButton.BackgroundColor3 = Color3.new(0.1, 0.3, 0.1)
+            copyButton.TextColor3 = Color3.new(0.3, 1, 0.3)
+            
+            wait(1)
+            copyButton.Text = originalText
+            copyButton.BackgroundColor3 = originalBgColor
+            copyButton.TextColor3 = originalTextColor
+        end)
+        local function handleManualScroll(direction)
+            local scrollAmount = isMobile and 40 or 30
+            local currentY = scrollFrame.CanvasPosition.Y
+            local maxScroll = math.max(0, scrollFrame.CanvasSize.Y.Offset - scrollFrame.AbsoluteWindowSize.Y)
+            local newY = currentY + (scrollAmount * direction)
+            
+            if newY > maxScroll then
+                newY = 0
+            elseif newY < 0 then
+                newY = maxScroll
+            end
+            
+            scrollFrame.CanvasPosition = Vector2.new(0, newY)
+        end
+        scrollFrame.MouseWheelForward:Connect(function()
+            handleManualScroll(-1)
+        end)
+        scrollFrame.MouseWheelBackward:Connect(function()
+            handleManualScroll(1)
+        end)
+        local touchStartPos = nil
+        local touchStartScrollPos = nil
+        local isTouching = false
+        
+        if isMobile then
+            scrollFrame.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.Touch then
+                    touchStartPos = input.Position
+                    touchStartScrollPos = scrollFrame.CanvasPosition
+                    isTouching = true
+                end
+            end)
+            scrollFrame.InputChanged:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.Touch and touchStartPos and isTouching then
+                    local delta = input.Position - touchStartPos
+                    local newY = touchStartScrollPos.Y - delta.Y
+                    local maxScroll = math.max(0, scrollFrame.CanvasSize.Y.Offset - scrollFrame.AbsoluteWindowSize.Y)
+                    
+                    scrollFrame.CanvasPosition = Vector2.new(0, math.clamp(newY, -50, maxScroll + 50))
+                end
+            end)
+            scrollFrame.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.Touch then
+                    isTouching = false
+                    
+                    local currentY = scrollFrame.CanvasPosition.Y
+                    local maxScroll = math.max(0, scrollFrame.CanvasSize.Y.Offset - scrollFrame.AbsoluteWindowSize.Y)
+                    
+                    if currentY < 0 then
+                        scrollFrame.CanvasPosition = Vector2.new(0, maxScroll)
+                    elseif currentY > maxScroll then
+                        scrollFrame.CanvasPosition = Vector2.new(0, 0)
+                    end
+                end
+            end)
+        end
+        local dragging = false
+        local dragInput
+        local dragStart
+        local startPos
+        local function updateDrag(input)
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+        dragHeader.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = frame.Position
+                
+                local connection
+                connection = input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                        connection:Disconnect()
+                    end
+                end)
+            end
+        end)
+        dragHeader.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                updateDrag(input)
+            end
+        end)
+        closeButton.MouseButton1Click:Connect(function()
+            screenGui:Destroy()
+        end)
+        if not isMobile then
+            closeButton.MouseEnter:Connect(function()
+                closeButton.BackgroundColor3 = Color3.new(0.5, 0.2, 0.2)
+                closeButton.TextColor3 = Color3.new(1, 0.5, 0.5)
+            end)
+            closeButton.MouseLeave:Connect(function()
+                closeButton.BackgroundColor3 = Color3.new(0.3, 0.1, 0.1)
+                closeButton.TextColor3 = Color3.new(1, 0.3, 0.3)
+            end)
+            copyButton.MouseEnter:Connect(function()
+                copyButton.BackgroundColor3 = Color3.new(0.2, 0.2, 0.5)
+                copyButton.TextColor3 = Color3.new(0.5, 0.5, 1)
+            end)
+            copyButton.MouseLeave:Connect(function()
+                copyButton.BackgroundColor3 = Color3.new(0.1, 0.1, 0.3)
+                copyButton.TextColor3 = Color3.new(0.3, 0.3, 1)
+            end)
+        end
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "OPTIZ",
+            Text = "Replace the old config with the new one!",
+            Duration= "9";
+        })
+        return screenGui
     end
-    UpdateLog()
+    CreateUpdateLog()
+    
     local function RemoveMesh(target)
         local textureKeywords = {
             "chair", "seat", "stool", "bench", "coffee", "fruit", "paper", "document", 
@@ -322,6 +460,7 @@ local function Main(ExternalConfig)
     end
     RemoveMesh()
     local function fpsc()
+        if not Config.FPS_MONITOR then return end
         loadstring(game:HttpGet("https://raw.githubusercontent.com/hm5650/Fps-counter/refs/heads/main/Fpsc", true))()
     end
     fpsc()
@@ -1014,6 +1153,74 @@ local function Main(ExternalConfig)
             end
         end)
     end
+    local function removeGrass()
+        if not Config.REMOVE_GRASS then return end
+        
+        if not game:IsLoaded() then
+            repeat
+                task.wait()
+            until game:IsLoaded()
+        end
+        coroutine.wrap(pcall)(function()
+            local terrain = workspace:FindFirstChildOfClass("Terrain")
+            if not terrain then
+                repeat
+                    task.wait()
+                until workspace:FindFirstChildOfClass("Terrain")
+                terrain = workspace:FindFirstChildOfClass("Terrain")
+            end
+            
+            if sethiddenproperty then
+                sethiddenproperty(terrain, "Decoration", false)
+            else
+                -- Fallback method if sethiddenproperty is not available
+                pcall(function()
+                    terrain.Decoration = false
+                end)
+                warn("Your exploit does not support sethiddenproperty, using alternative method.")
+            end
+            
+            -- Additional grass/foliage removal methods
+            pcall(function()
+                -- Remove grass parts that might already be loaded
+                for _, obj in ipairs(workspace:GetDescendants()) do
+                    if obj:IsA("Part") and (string.lower(obj.Name):find("grass") or 
+                       string.lower(obj.Name):find("foliage") or 
+                       string.lower(obj.Name):find("leaf") or
+                       string.lower(obj.Name):find("plant")) then
+                        obj:Destroy()
+                    end
+                end
+                
+                -- Set terrain attributes to minimize grass
+                terrain:SetAttribute("GrassEnabled", false)
+                terrain:SetAttribute("GrassDistance", 0)
+                terrain:SetAttribute("GrassDensity", 0)
+            end)
+            
+            if _G.ConsoleLogs then
+                warn("Grass and Decorations Disabled")
+            end
+        end)
+    end
+    local function NoParticles()
+        if not Config.DESTROY_PARTICLES then return end
+        local RunService = game:GetService("RunService")
+        local workspace = game:GetService("Workspace")
+        local function removeParticleEmitters()
+            for _, descendant in ipairs(workspace:GetDescendants()) do
+                -- Check if the object is a ParticleEmitter
+                if descendant:IsA("ParticleEmitter") then
+                    descendant:Destroy()
+                end
+            end
+        end
+        
+        while true do
+            removeParticleEmitters()
+            wait(0.1)
+        end
+    end
     local function applya()
         if not Config.ENABLED then return end
         
@@ -1048,6 +1255,8 @@ local function Main(ExternalConfig)
         disableUnnecessaryGUI()
         throttleSounds()
         optimizeDataModel()
+        removeGrass()
+        NoParticles()
     end
     applya()
     Players.PlayerAdded:Connect(function(player)
